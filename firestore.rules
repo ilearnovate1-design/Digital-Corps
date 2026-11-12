@@ -51,6 +51,7 @@ service cloud.firestore {
         'phone',
         'email',
         'stateCode',
+        'engagementType',
         'platoon',
         'primarySkillTrack',
         'skillLevel',
@@ -71,6 +72,7 @@ service cloud.firestore {
       (!('phone' in data) || (data.phone is string && data.phone.size() <= 25)) &&
       (('email' in data && data.email.size() >= 5) || ('phone' in data && data.phone.size() >= 7)) &&
       (!('stateCode' in data) || (data.stateCode is string && data.stateCode.size() <= 20)) &&
+      (!('engagementType' in data) || (data.engagementType in ['on_camp', 'post_camp'])) &&
       (!('platoon' in data) || (data.platoon is int && data.platoon >= 0 && data.platoon <= 10)) &&
       (!('primarySkillTrack' in data) || (data.primarySkillTrack is string && data.primarySkillTrack.size() <= 60)) &&
       (!('skillLevel' in data) || (data.skillLevel in ['beginner', 'intermediate', 'advanced', 'not_specified'])) &&

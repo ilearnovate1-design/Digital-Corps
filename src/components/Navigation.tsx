@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavigationTab } from '../types';
 import {
-  Home,
   UserCheck,
   Target,
   BookOpen,
@@ -23,7 +22,6 @@ export const Navigation: React.FC<NavigationProps> = ({
   isRegistered,
 }) => {
   const tabs: { id: NavigationTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'welcome', label: 'Welcome', icon: <Home className="w-4 h-4" /> },
     { id: 'quiz', label: 'Digital Quiz', icon: <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />, badge: '5-Min' },
     { id: 'academy', label: 'Academy', icon: <GraduationCap className="w-4 h-4 text-emerald-500" />, badge: '6 Courses' },
     { 
@@ -81,16 +79,6 @@ export const Navigation: React.FC<NavigationProps> = ({
       {/* Fixed bottom navigation bar for mobile thumb reach */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 shadow-lg px-1 py-1 safe-area-pb">
         <div className="flex items-center justify-around max-w-md mx-auto">
-          <button
-            onClick={() => onNavigate('welcome')}
-            className={`flex flex-col items-center py-1 px-1.5 rounded-lg cursor-pointer transition-colors ${
-              currentTab === 'welcome' ? 'text-emerald-700 font-bold' : 'text-stone-500'
-            }`}
-          >
-            <Home className="w-4 h-4" />
-            <span className="text-[10px] mt-0.5">Home</span>
-          </button>
-
           <button
             onClick={() => onNavigate('quiz')}
             className={`flex flex-col items-center py-1 px-1.5 rounded-lg cursor-pointer transition-colors ${

@@ -42,7 +42,10 @@ export interface ParticipantRecordItem {
   phone?: string;
   email?: string;
   deploymentState?: string;
+  engagementType?: 'on_camp' | 'post_camp';
   platoon?: number;
+  cdsGroupId?: string;
+  cdsGroupName?: string;
   primarySkillTrack?: string;
   communityOptIn: boolean;
   marketingConsent: boolean;
@@ -246,7 +249,10 @@ export async function loadPaginatedParticipants(
         phone: phoneVal,
         email: emailVal,
         deploymentState: data.deploymentState,
+        engagementType: data.engagementType,
         platoon: data.platoon,
+        cdsGroupId: data.cdsGroupId,
+        cdsGroupName: data.cdsGroupName,
         primarySkillTrack: data.primarySkillTrack,
         communityOptIn: Boolean(data.communityOptIn),
         marketingConsent: Boolean(data.marketingConsent),
@@ -277,7 +283,9 @@ export async function exportParticipantsCSV(adminEmail: string): Promise<string>
       'First Name',
       'Surname',
       'NYSC State Code',
+      'Engagement',
       'Platoon',
+      'CDS Group',
       'Deployment State',
       'Phone / WhatsApp',
       'Email Address',
@@ -292,13 +300,17 @@ export async function exportParticipantsCSV(adminEmail: string): Promise<string>
       const phoneVal = d.phone || '';
       const emailVal = d.email || '';
       const stateVal = d.deploymentState || 'N/A';
+      const engagementVal = d.engagementType === 'post_camp' ? 'Post Camp' : d.engagementType === 'on_camp' ? 'On Camp' : (d.cdsGroupName ? 'Post Camp' : d.platoon ? 'On Camp' : 'N/A');
+      const cdsVal = d.cdsGroupName || 'N/A';
       const regTime = d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : d.consentTimestamp || '';
       return [
         `"${docSnap.id}"`,
         `"${(d.firstName || '').replace(/"/g, '""')}"`,
         `"${(d.surname || '').replace(/"/g, '""')}"`,
         `"${d.stateCode || 'N/A'}"`,
+        `"${engagementVal}"`,
         d.platoon || 'N/A',
+        `"${cdsVal.replace(/"/g, '""')}"`,
         `"${stateVal.replace(/"/g, '""')}"`,
         `"${phoneVal.replace(/"/g, '""')}"`,
         `"${emailVal.replace(/"/g, '""')}"`,

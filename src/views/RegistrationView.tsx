@@ -46,7 +46,11 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [phone, setPhone] = useState(initialData?.phone || '');
   const [email, setEmail] = useState(initialData?.email || '');
 
-  // Compulsory Camp details
+  // Compulsory Engagement & NYSC details
+  const [engagementType, setEngagementType] = useState<'on_camp' | 'post_camp' | ''>(
+    initialData?.engagementType ||
+      (initialData?.cdsGroupId ? 'post_camp' : initialData?.platoon && initialData.platoon > 0 ? 'on_camp' : '')
+  );
   const [platoon, setPlatoon] = useState<number>(initialData?.platoon || 0);
   const [stateCode, setStateCode] = useState(initialData?.stateCode || '');
   const [deploymentState, setDeploymentState] = useState(initialData?.deploymentState || '');
@@ -68,19 +72,20 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [selectedCdsGroupName, setSelectedCdsGroupName] = useState(initialData?.cdsGroupName || '');
   const [isLoadingCDS, setIsLoadingCDS] = useState(false);
 
+  const fetchCDSGroups = async () => {
+    setIsLoadingCDS(true);
+    try {
+      const groups = await loadActiveCDSGroups();
+      setCdsGroups(groups);
+    } catch (err) {
+      console.error('Failed to load CDS groups:', err);
+    } finally {
+      setIsLoadingCDS(false);
+    }
+  };
+
   React.useEffect(() => {
-    const fetchCDS = async () => {
-      setIsLoadingCDS(true);
-      try {
-        const groups = await loadActiveCDSGroups();
-        setCdsGroups(groups);
-      } catch (err) {
-        console.error('Failed to load CDS groups:', err);
-      } finally {
-        setIsLoadingCDS(false);
-      }
-    };
-    fetchCDS();
+    fetchCDSGroups();
   }, []);
   const [marketingConsent, setMarketingConsent] = useState<boolean>(
     initialData ? initialData.marketingConsent : false
@@ -120,9 +125,17 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       errs.email = 'Please enter a valid email address (e.g. corper@gmail.com)';
     }
 
-    // 3. Camp details are COMPULSORY
-    if (!platoon || platoon < 1 || platoon > 10) {
-      errs.platoon = 'Camp Platoon is compulsory (please select Platoon 1 to 10)';
+    // 3. Engagement details are COMPULSORY
+    if (!engagementType) {
+      errs.engagementType = 'Please select your engagement stage (On Camp or Post Camp)';
+    } else if (engagementType === 'on_camp') {
+      if (!platoon || platoon < 1 || platoon > 10) {
+        errs.platoon = 'Camp Platoon is compulsory for On Camp participants (please select Platoon 1 to 10)';
+      }
+    } else if (engagementType === 'post_camp') {
+      if (cdsGroups.length > 0 && !selectedCdsGroupId) {
+        errs.cdsGroup = 'Please select one of the available CDS groups';
+      }
     }
 
     const cleanStateCode = stateCode.trim().toUpperCase();
@@ -170,7 +183,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
       stateCode: stateCode.trim().toUpperCase(),
-      platoon: Number(platoon),
+      engagementType: engagementType as 'on_camp' | 'post_camp',
+      platoon: engagementType === 'on_camp' ? Number(platoon) : 0,
       deploymentState: deploymentState.trim(),
       primarySkillTrack: primarySkillTrack.trim() || undefined,
       skillLevel: skillLevel !== 'not_specified' ? skillLevel : undefined,
@@ -179,8 +193,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       consentTimestamp: now,
       campaignId: CURRENT_CAMPAIGN_ID,
       registrationId: stableDocIdRef.current,
-      cdsGroupId: selectedCdsGroupId,
-      cdsGroupName: selectedCdsGroupName
+      cdsGroupId: engagementType === 'post_camp' ? selectedCdsGroupId : '',
+      cdsGroupName: engagementType === 'post_camp' ? selectedCdsGroupName : ''
     };
 
     try {
@@ -210,7 +224,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       phone: phone.trim(),
       email: email.trim().toLowerCase(),
       stateCode: stateCode.trim().toUpperCase(),
-      platoon: Number(platoon),
+      engagementType: engagementType as 'on_camp' | 'post_camp',
+      platoon: engagementType === 'on_camp' ? Number(platoon) : 0,
       deploymentState: deploymentState.trim(),
       primarySkillTrack: primarySkillTrack.trim() || undefined,
       skillLevel: skillLevel !== 'not_specified' ? skillLevel : undefined,
@@ -219,6 +234,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       consentTimestamp: now,
       campaignId: CURRENT_CAMPAIGN_ID,
       registrationId: stableDocIdRef.current,
+      cdsGroupId: engagementType === 'post_camp' ? selectedCdsGroupId : '',
+      cdsGroupName: engagementType === 'post_camp' ? selectedCdsGroupName : ''
     };
     onSaveRegistration(completedRegistration);
     onNavigate('success');
@@ -237,7 +254,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
               Participant Registration
             </h2>
             <p className="text-xs text-stone-600">
-              Personal information, contact details (Phone & Email), and NYSC camp details are compulsory. No passwords or account setup required.
+              Personal information, contact details (Phone & Email), and engagement details are compulsory. No passwords or account setup required.
             </p>
           </div>
         </div>
@@ -425,46 +442,129 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
           </div>
         </div>
 
-        {/* SECTION 3: Camp Details (COMPULSORY) */}
+        {/* SECTION 3: Engagement (COMPULSORY) */}
         <div className="pt-2 border-t border-stone-100">
           <div className="flex items-center justify-between mb-1.5">
             <h3 className="text-xs font-black text-stone-700 uppercase tracking-wider flex items-center gap-2">
               <Flag className="w-4 h-4 text-emerald-600" />
-              <span>3. NYSC Camp & Platoon Details (Compulsory)</span>
+              <span>3. Engagement (Compulsory)</span>
             </h3>
             <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
               Compulsory
             </span>
           </div>
           <p className="text-xs text-stone-500 mb-3">
-            Compulsory for orientation camp verification and the inter-platoon Rapid-Fire Quiz competition.
+            Select whether you are participating On Camp or Post Camp to link your Platoon or CDS Group.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Camp Platoon */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Engagement Dropdown */}
             <div>
               <label className="block text-xs font-bold text-stone-800 mb-1.5 uppercase tracking-wide">
-                Camp Platoon <span className="text-red-500">*</span>
+                Engagement <span className="text-red-500">*</span>
               </label>
               <select
-                value={platoon}
+                value={engagementType}
                 onChange={(e) => {
-                  setPlatoon(Number(e.target.value));
-                  if (errors.platoon) setErrors({ ...errors, platoon: '' });
+                  const val = e.target.value as 'on_camp' | 'post_camp';
+                  setEngagementType(val);
+                  if (val === 'on_camp') {
+                    setSelectedCdsGroupId('');
+                    setSelectedCdsGroupName('');
+                    setErrors((prev) => ({ ...prev, engagementType: '', cdsGroup: '' }));
+                  } else if (val === 'post_camp') {
+                    setPlatoon(0);
+                    setErrors((prev) => ({ ...prev, engagementType: '', platoon: '' }));
+                    if (cdsGroups.length === 0 && !isLoadingCDS) {
+                      fetchCDSGroups();
+                    }
+                  }
                 }}
                 className={`w-full px-3 py-2.5 text-sm bg-stone-50 border rounded-xl focus:bg-white focus:outline-none transition-colors ${
-                  errors.platoon ? 'border-red-400 ring-1 ring-red-300' : 'border-stone-300 focus:border-emerald-600'
+                  errors.engagementType ? 'border-red-400 ring-1 ring-red-300' : 'border-stone-300 focus:border-emerald-600'
                 }`}
               >
-                <option value={0} disabled>Select Platoon (1–10)...</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                  <option key={num} value={num}>Platoon {num}</option>
-                ))}
+                <option value="" disabled>Select Engagement...</option>
+                <option value="on_camp">On Camp</option>
+                <option value="post_camp">Post Camp</option>
               </select>
-              {errors.platoon && (
-                <p className="text-red-600 text-xs mt-1">{errors.platoon}</p>
+              {errors.engagementType && (
+                <p className="text-red-600 text-xs mt-1">{errors.engagementType}</p>
               )}
             </div>
+
+            {/* Conditional Selection: Camp Platoon (On Camp) OR CDS Group (Post Camp) */}
+            {engagementType === 'on_camp' && (
+              <div>
+                <label className="block text-xs font-bold text-stone-800 mb-1.5 uppercase tracking-wide">
+                  Camp Platoon <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={platoon}
+                  onChange={(e) => {
+                    setPlatoon(Number(e.target.value));
+                    if (errors.platoon) setErrors({ ...errors, platoon: '' });
+                  }}
+                  className={`w-full px-3 py-2.5 text-sm bg-stone-50 border rounded-xl focus:bg-white focus:outline-none transition-colors ${
+                    errors.platoon ? 'border-red-400 ring-1 ring-red-300' : 'border-stone-300 focus:border-emerald-600'
+                  }`}
+                >
+                  <option value={0} disabled>Select Platoon (1–10)...</option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                    <option key={num} value={num}>Platoon {num}</option>
+                  ))}
+                </select>
+                {errors.platoon && (
+                  <p className="text-red-600 text-xs mt-1">{errors.platoon}</p>
+                )}
+              </div>
+            )}
+
+            {engagementType === 'post_camp' && (
+              <div>
+                <label className="block text-xs font-bold text-stone-800 mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>CDS Group {cdsGroups.length > 0 && <span className="text-red-500">*</span>}</span>
+                </label>
+                <select
+                  value={selectedCdsGroupId}
+                  disabled={isLoadingCDS}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedCdsGroupId(id);
+                    const name = cdsGroups.find(g => g.id === id)?.name || '';
+                    setSelectedCdsGroupName(name);
+                    if (errors.cdsGroup) setErrors({ ...errors, cdsGroup: '' });
+                  }}
+                  className={`w-full px-3 py-2.5 text-sm bg-emerald-50/40 border rounded-xl focus:bg-white focus:outline-none transition-colors ${
+                    errors.cdsGroup ? 'border-red-400 ring-1 ring-red-300' : 'border-emerald-300 focus:border-emerald-600'
+                  }`}
+                >
+                  <option value="">
+                    {isLoadingCDS
+                      ? 'Loading CDS groups...'
+                      : cdsGroups.length === 0
+                      ? 'No active CDS groups available yet'
+                      : 'Select your CDS Group...'}
+                  </option>
+                  {cdsGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                      {group.lga || group.state ? ` (${[group.lga, group.state].filter(Boolean).join(', ')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {errors.cdsGroup ? (
+                  <p className="text-red-600 text-xs mt-1">{errors.cdsGroup}</p>
+                ) : (
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {cdsGroups.length > 0
+                      ? 'Select the CDS group created for your post-camp digital skills activities.'
+                      : 'No CDS groups have been added by an admin yet.'}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* NYSC State Code */}
             <div>
@@ -486,29 +586,6 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
               {errors.stateCode && (
                 <p className="text-red-600 text-xs mt-1">{errors.stateCode}</p>
               )}
-            </div>
-
-            {/* CDS Group (Optional / Post-Camp) */}
-            <div>
-              <label className="block text-xs font-bold text-stone-800 mb-1.5 uppercase tracking-wide">
-                CDS Group (Optional)
-              </label>
-              <select
-                value={selectedCdsGroupId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setSelectedCdsGroupId(id);
-                  const name = cdsGroups.find(g => g.id === id)?.name || '';
-                  setSelectedCdsGroupName(name);
-                }}
-                className="w-full px-3 py-2.5 text-sm bg-stone-50 border border-stone-300 rounded-xl focus:bg-white focus:outline-none focus:border-emerald-600 transition-colors"
-              >
-                <option value="">Select CDS Group...</option>
-                {cdsGroups.map((group) => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-              <p className="text-[10px] text-stone-400 mt-1">Select for post-camp digital skills collaboration</p>
             </div>
 
             {/* State of Deployment */}

@@ -34,6 +34,9 @@ export async function registerParticipant(data: ParticipantRegistration): Promis
     createdAt: serverTimestamp(), // Validated as request.time
   };
 
+  if (data.engagementType) {
+    payload.engagementType = data.engagementType;
+  }
   if (data.primarySkillTrack && data.primarySkillTrack.trim()) {
     payload.primarySkillTrack = data.primarySkillTrack.trim().substring(0, 60);
   }

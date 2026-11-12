@@ -963,7 +963,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                             <tr>
                               <th className="p-2.5">Name</th>
                               <th className="p-2.5">State Code</th>
-                              <th className="p-2.5">Platoon</th>
+                              <th className="p-2.5">Engagement / Group</th>
                               <th className="p-2.5">Contact</th>
                               <th className="p-2.5">Community</th>
                               <th className="p-2.5">Marketing</th>
@@ -980,7 +980,19 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                                   {p.stateCode || '—'}
                                 </td>
                                 <td className="p-2.5">
-                                  {p.platoon ? `P${p.platoon}` : '—'}
+                                  {p.platoon && p.platoon > 0 ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-stone-100 text-stone-800 font-semibold text-[11px]">
+                                      On Camp • P{p.platoon}
+                                    </span>
+                                  ) : p.cdsGroupName ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 font-semibold text-[11px]">
+                                      Post Camp • {p.cdsGroupName}
+                                    </span>
+                                  ) : p.engagementType === 'post_camp' ? (
+                                    <span className="text-stone-600 text-[11px]">Post Camp</span>
+                                  ) : (
+                                    '—'
+                                  )}
                                 </td>
                                 <td className="p-2.5 font-mono text-[11px] text-stone-600">
                                   {p.phone && <div className="text-stone-800 font-semibold">{p.phone}</div>}

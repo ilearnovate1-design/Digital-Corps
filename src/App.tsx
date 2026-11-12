@@ -91,7 +91,9 @@ export default function App() {
     name: `${registeredUser.firstName} ${registeredUser.surname}`,
     email: registeredUser.email,
     phone: registeredUser.phone,
-    platoon: `Platoon ${registeredUser.platoon}`,
+    platoon: registeredUser.platoon > 0
+      ? `Platoon ${registeredUser.platoon}`
+      : (registeredUser.cdsGroupName || 'Post Camp'),
     stateCode: registeredUser.stateCode,
     callUpNumber: registeredUser.callUpNumber,
     registeredAt: registeredUser.consentTimestamp

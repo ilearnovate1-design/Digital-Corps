@@ -57,6 +57,11 @@
           "maxLength": 50,
           "description": "Optional deployment state."
         },
+        "engagementType": {
+          "type": "string",
+          "enum": ["on_camp", "post_camp"],
+          "description": "Participant engagement stage (On Camp or Post Camp)."
+        },
         "cdsGroupId": {
           "type": "string",
           "maxLength": 80,
@@ -469,61 +474,6 @@
         "submissionStatus",
         "submittedAt"
       ]
-    }
-  },
-  "firestore": {
-    "/participants/{participantId}": {
-      "schema": {
-        "$ref": "#/entities/Participant"
-      },
-      "description": "Store participant registration records created during camp digital day."
-    },
-    "/challengeSubmissions/{submissionId}": {
-      "schema": {
-        "$ref": "#/entities/ChallengeSubmission"
-      },
-      "description": "Store platoon AI challenge submissions."
-    },
-    "/quizResults/{resultId}": {
-      "schema": {
-        "$ref": "#/entities/QuizResult"
-      },
-      "description": "Store official Rapid-Fire Digital Quiz competition results."
-    },
-    "/learningProgress/{progressId}": {
-      "schema": {
-        "$ref": "#/entities/LearningProgress"
-      },
-      "description": "Store participant progress across Academy courses."
-    },
-    "/courseProjectSubmissions/{submissionId}": {
-      "schema": {
-        "$ref": "#/entities/CourseProjectSubmission"
-      },
-      "description": "Store capstone project submissions for Academy courses."
-    },
-    "AdminUser": {
-      "title": "AdminUser",
-      "description": "Authorized administrator profile.",
-      "type": "object",
-      "properties": {
-        "email": {
-          "type": "string",
-          "maxLength": 100,
-          "description": "Administrator email address."
-        },
-        "role": {
-          "type": "string",
-          "enum": ["lead_coordinator", "camp_director", "state_officer"],
-          "description": "Administrator role."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "When the administrator was provisioned."
-        }
-      },
-      "required": ["email", "role"]
     },
     "CDSGroup": {
       "title": "CDSGroup",

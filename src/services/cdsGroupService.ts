@@ -25,14 +25,14 @@ export async function loadActiveCDSGroups(): Promise<CDSGroup[]> {
   try {
     const q = query(
       collection(db, 'cdsGroups'),
-      where('active', '==', true),
-      orderBy('name', 'asc')
+      where('active', '==', true)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({
+    const groups = snap.docs.map(d => ({
       ...d.data(),
       id: d.id
     } as CDSGroup));
+    return groups.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'cdsGroups');
     return [];

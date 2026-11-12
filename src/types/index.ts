@@ -5,13 +5,14 @@ export interface ParticipantRegistration {
   phone: string; // Compulsory: Phone/WhatsApp number
   email: string; // Compulsory: Email address
   stateCode: string; // Compulsory: NYSC State Code e.g. LA/26A/1234
-  platoon: number; // Compulsory: 1 to 10
+  engagementType?: 'on_camp' | 'post_camp'; // On Camp or Post Camp
+  platoon: number; // 1 to 10 for On Camp, 0 for Post Camp
   deploymentState: string; // Compulsory: State of deployment e.g. Lagos, Kano
   callUpNumber?: string; // Optional NYSC call-up number
   primarySkillTrack?: string; // Optional digital interest track
   skillLevel?: 'beginner' | 'intermediate' | 'advanced' | 'not_specified'; // Optional
-  cdsGroupId?: string; // Optional CDS group ID
-  cdsGroupName?: string; // Optional CDS group display name
+  cdsGroupId?: string; // Post-Camp CDS group ID
+  cdsGroupName?: string; // Post-Camp CDS group display name
   communityOptIn: boolean; // Optional separate checkbox - starts unchecked (false)
   marketingConsent: boolean; // Optional separate checkbox - starts unchecked (false)
   consentTimestamp: string;

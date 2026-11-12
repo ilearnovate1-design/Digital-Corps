@@ -40,9 +40,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Main app bar */}
       <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
-        <div 
+        <button
+          type="button"
           onClick={() => onNavigate('welcome')}
-          className="flex items-center gap-2.5 cursor-pointer select-none group"
+          title="Back to Home"
+          aria-label="Digital Corps Hub Home"
+          className="flex items-center gap-2.5 cursor-pointer select-none group text-left"
         >
           {/* Platform Badge */}
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center p-1 shadow-inner border border-emerald-300">
@@ -63,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
               Empowering 2,000 Corps Members • Independent Skills Initiative
             </p>
           </div>
-        </div>
+        </button>
 
         {/* Right side action */}
         <div className="flex items-center gap-2">
@@ -74,7 +77,13 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Award className="w-3.5 h-3.5 text-stone-900" />
               <span className="hidden sm:inline">My Pass:</span>
-              <span className="font-mono text-[11px] font-bold">P{registeredUser.platoon}</span>
+              <span className="font-mono text-[11px] font-bold">
+                {registeredUser.platoon > 0
+                  ? `P${registeredUser.platoon}`
+                  : registeredUser.engagementType === 'post_camp' || registeredUser.cdsGroupId
+                  ? 'CDS'
+                  : 'PASS'}
+              </span>
             </button>
           ) : (
             <button
