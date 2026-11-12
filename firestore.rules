@@ -1,0 +1,307 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Reusable Helper Functions
+    function isValidId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/adminUsers/$(request.auth.uid)) ||
+        (request.auth.token.email == 'jomaschools@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    // Validation Blueprint for Minimal Participant Registration
+    function isValidParticipant(data) {
+      return data.keys().hasAll([
+        'firstName',
+        'surname',
+        'contactMethod',
+        'communityOptIn',
+        'marketingConsent',
+        'consentTimestamp',
+        'campaignId',
+        'registrationId',
+        'createdAt'
+      ]) && data.keys().hasOnly([
+        'firstName',
+        'surname',
+        'contactMethod',
+        'phone',
+        'email',
+        'stateCode',
+        'platoon',
+        'primarySkillTrack',
+        'skillLevel',
+        'deploymentState',
+        'cdsGroupId',
+        'cdsGroupName',
+        'communityOptIn',
+        'marketingConsent',
+        'consentTimestamp',
+        'campaignId',
+        'registrationId',
+        'createdAt'
+      ]) &&
+      data.firstName is string && data.firstName.size() >= 1 && data.firstName.size() <= 50 &&
+      data.surname is string && data.surname.size() >= 1 && data.surname.size() <= 50 &&
+      data.contactMethod in ['email', 'phone', 'both'] &&
+      (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+      (!('phone' in data) || (data.phone is string && data.phone.size() <= 25)) &&
+      (('email' in data && data.email.size() >= 5) || ('phone' in data && data.phone.size() >= 7)) &&
+      (!('stateCode' in data) || (data.stateCode is string && data.stateCode.size() <= 20)) &&
+      (!('platoon' in data) || (data.platoon is int && data.platoon >= 0 && data.platoon <= 10)) &&
+      (!('primarySkillTrack' in data) || (data.primarySkillTrack is string && data.primarySkillTrack.size() <= 60)) &&
+      (!('skillLevel' in data) || (data.skillLevel in ['beginner', 'intermediate', 'advanced', 'not_specified'])) &&
+      (!('deploymentState' in data) || (data.deploymentState is string && data.deploymentState.size() <= 50)) &&
+      (!('cdsGroupId' in data) || (data.cdsGroupId is string && data.cdsGroupId.size() <= 80)) &&
+      (!('cdsGroupName' in data) || (data.cdsGroupName is string && data.cdsGroupName.size() <= 120)) &&
+      data.communityOptIn is bool &&
+      data.marketingConsent is bool &&
+      data.consentTimestamp is string && data.consentTimestamp.size() <= 40 &&
+      data.campaignId is string && data.campaignId.size() >= 3 && data.campaignId.size() <= 64 &&
+      data.registrationId is string && data.registrationId.size() >= 6 && data.registrationId.size() <= 40 &&
+      (data.createdAt == request.time || data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40));
+    }
+
+    // Validation Blueprint for CDS Group
+    function isValidCDSGroup(data) {
+      return data.keys().hasAll(['name', 'active', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'name', 'description', 'lga', 'state', 'meetingDay', 'active', 'createdAt', 'createdBy']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 80)) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+        (!('lga' in data) || (data.lga is string && data.lga.size() <= 80)) &&
+        (!('state' in data) || (data.state is string && data.state.size() <= 50)) &&
+        (!('meetingDay' in data) || (data.meetingDay is string && data.meetingDay.size() <= 80)) &&
+        data.active is bool &&
+        (data.createdAt == request.time || data.createdAt is string) &&
+        (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 100));
+    }
+
+    // Validation Blueprint for Challenge Submission
+    function isValidChallengeSubmission(data) {
+      return data.keys().hasAll([
+        'participantName',
+        'solutionTitle',
+        'solutionSummary',
+        'campaignId',
+        'createdAt'
+      ]) && data.keys().hasOnly([
+        'participantReference',
+        'participantName',
+        'platoon',
+        'solutionTitle',
+        'solutionSummary',
+        'actionPlan30Days',
+        'campaignId',
+        'createdAt'
+      ]) &&
+      data.participantName is string && data.participantName.size() >= 2 && data.participantName.size() <= 100 &&
+      data.solutionTitle is string && data.solutionTitle.size() >= 3 && data.solutionTitle.size() <= 120 &&
+      data.solutionSummary is string && data.solutionSummary.size() >= 10 && data.solutionSummary.size() <= 1200 &&
+      (!('participantReference' in data) || (data.participantReference is string && data.participantReference.size() <= 40)) &&
+      (!('platoon' in data) || (data.platoon is int && data.platoon >= 0 && data.platoon <= 10)) &&
+      (!('actionPlan30Days' in data) || (data.actionPlan30Days is string && data.actionPlan30Days.size() <= 1000)) &&
+      data.campaignId is string && data.campaignId.size() >= 3 && data.campaignId.size() <= 64 &&
+      (data.createdAt == request.time || data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 40));
+    }
+
+    // Validation Blueprint for Admin Audit Log
+    function isValidAdminAuditLog(data) {
+      return data.keys().hasAll(['adminEmail', 'action', 'details', 'timestamp']) &&
+        data.keys().hasOnly(['adminEmail', 'action', 'details', 'timestamp']) &&
+        data.adminEmail is string && data.adminEmail.size() <= 100 &&
+        data.action in ['CSV_EXPORT', 'REPORT_GENERATION', 'QUIZ_RESULT_INVALIDATION', 'MESSAGE_BROADCAST', 'DIRECT_MESSAGE_SENT', 'CDS_GROUP_CREATE', 'CDS_GROUP_UPDATE'] &&
+        data.details is string && data.details.size() <= 500 &&
+        data.timestamp is string;
+    }
+
+    // Validation Blueprint for Official Quiz Result
+    function isValidQuizResult(resultId, data) {
+      let participantPath = /databases/$(database)/documents/participants/$(data.participantId);
+      return data.keys().hasAll([
+        'participantId',
+        'quizRoundId',
+        'campaignId',
+        'score',
+        'totalQuestions',
+        'qualifying',
+        'platoon',
+        'submittedAt',
+        'status'
+      ]) && data.keys().hasOnly([
+        'participantId',
+        'quizRoundId',
+        'campaignId',
+        'categoryId',
+        'categoryName',
+        'score',
+        'totalQuestions',
+        'qualifying',
+        'platoon',
+        'submittedAt',
+        'status',
+        'invalidationReason',
+        'attemptId',
+        'timeTakenSeconds'
+      ]) &&
+      (
+        resultId == data.quizRoundId + '_' + data.participantId ||
+        (('categoryId' in data) && resultId == data.quizRoundId + '_' + data.categoryId + '_' + data.participantId)
+      ) &&
+      exists(participantPath) &&
+      data.participantId is string && data.participantId.size() >= 6 && data.participantId.size() <= 40 &&
+      data.quizRoundId is string && data.quizRoundId.size() >= 3 && data.quizRoundId.size() <= 40 &&
+      data.campaignId is string && data.campaignId.size() >= 3 && data.campaignId.size() <= 64 &&
+      (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() <= 64)) &&
+      (!('categoryName' in data) || (data.categoryName is string && data.categoryName.size() <= 100)) &&
+      (!('attemptId' in data) || (data.attemptId is string && data.attemptId.size() <= 64)) &&
+      (!('timeTakenSeconds' in data) || (data.timeTakenSeconds is int && data.timeTakenSeconds >= 0 && data.timeTakenSeconds <= 600)) &&
+      data.score is int && data.score >= 0 && data.score <= 10 &&
+      data.totalQuestions == 10 &&
+      data.qualifying == (data.score >= 6) &&
+      data.platoon is int && data.platoon >= 0 && data.platoon <= 10 &&
+      (
+        (!('platoon' in get(participantPath).data) && data.platoon == 0) ||
+        ('platoon' in get(participantPath).data && data.platoon == get(participantPath).data.platoon)
+      ) &&
+      data.submittedAt is string && data.submittedAt.size() <= 40 &&
+      data.status in ['unverified', 'verified'];
+    }
+
+    // Validation for Admin Result Status Update
+    function isValidQuizResultUpdate(incomingData, existingData) {
+      return incomingData.diff(existingData).affectedKeys().hasOnly(['status', 'invalidationReason']) &&
+        incomingData.status in ['verified', 'invalidated', 'unverified'] &&
+        (!('invalidationReason' in incomingData) || (incomingData.invalidationReason is string && incomingData.invalidationReason.size() <= 500));
+    }
+
+    // 2. Collection: /participants/{participantId}
+    // Public blind-create only; READ is strictly RESTRICTED to verified admins.
+    match /participants/{participantId} {
+      allow create: if isValidId(participantId) && isValidParticipant(incoming());
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // 3. Collection: /challengeSubmissions/{submissionId}
+    // Public blind-create only; READ is strictly RESTRICTED to verified admins.
+    match /challengeSubmissions/{submissionId} {
+      allow create: if isValidId(submissionId) && isValidChallengeSubmission(incoming());
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // 4. Collection: /adminAuditLogs/{logId}
+    // Append-only for verified admins. No updates or deletes allowed.
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidAdminAuditLog(incoming());
+      allow update, delete: if false;
+    }
+
+    // 5. Collection: /cdsGroups/{groupId}
+    // Public read for selection; admin write for management.
+    match /cdsGroups/{groupId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidCDSGroup(incoming());
+    }
+
+    // 6. Collection: /adminUsers/{adminId}
+    match /adminUsers/{adminId} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == adminId);
+      allow write: if false;
+    }
+
+    // 7. Collection: /quizResults/{resultId}
+    // Public creation allowed ONLY for registered participants with verified platoon link.
+    // READ restricted to verified admins.
+    // Public updates and deletes are strictly prohibited.
+    // Admin update allowed exclusively to verify or invalidate results.
+    match /quizResults/{resultId} {
+      allow create: if isValidId(resultId) && isValidQuizResult(resultId, incoming());
+      allow read: if isAdmin();
+      allow update: if isAdmin() && isValidQuizResultUpdate(incoming(), existing());
+      allow delete: if false;
+    }
+
+    // 8. Collection: /learningProgress/{progressId}
+    // Format: ${courseId}_${participantId}
+    // Participant can manage their own progress; Admins can read for analytics.
+    function isValidLearningProgress(progressId, data) {
+      return data.keys().hasAll([
+        'participantId',
+        'courseId',
+        'enrolledAt',
+        'lastAccessedAt',
+        'completedLessonIds',
+        'courseStatus',
+        'progressPercentage'
+      ]) &&
+      progressId == data.courseId + '_' + data.participantId &&
+      data.participantId is string && data.participantId.size() >= 4 && data.participantId.size() <= 64 &&
+      data.courseId is string && data.courseId.size() >= 4 && data.courseId.size() <= 64 &&
+      data.completedLessonIds is list && data.completedLessonIds.size() <= 50 &&
+      data.courseStatus in ['not_started', 'in_progress', 'completed'] &&
+      data.progressPercentage is int && data.progressPercentage >= 0 && data.progressPercentage <= 100;
+    }
+
+    match /learningProgress/{progressId} {
+      allow create, update: if isValidId(progressId) && isValidLearningProgress(progressId, incoming());
+      allow read: if true; // Public read allows participant client caching and admin analytics
+      allow delete: if isAdmin();
+    }
+
+    // 9. Collection: /courseProjectSubmissions/{submissionId}
+    // Participants submit capstone projects; Admins can read, review, and feedback.
+    function isValidProjectSubmission(data) {
+      return data.keys().hasAll([
+        'submissionId',
+        'participantId',
+        'participantName',
+        'courseId',
+        'courseTitle',
+        'projectTitle',
+        'projectDescription',
+        'submissionStatus',
+        'submittedAt'
+      ]) &&
+      data.submissionId is string && data.submissionId.size() >= 6 &&
+      data.participantId is string && data.participantId.size() >= 4 &&
+      data.participantName is string && data.participantName.size() >= 2 &&
+      data.courseId is string && data.courseId.size() >= 4 &&
+      data.projectTitle is string && data.projectTitle.size() >= 3 && data.projectTitle.size() <= 150 &&
+      data.projectDescription is string && data.projectDescription.size() >= 10 && data.projectDescription.size() <= 2000 &&
+      data.submissionStatus in ['submitted', 'under_review', 'approved', 'revision_requested'];
+    }
+
+    match /courseProjectSubmissions/{submissionId} {
+      allow create: if isValidId(submissionId) && isValidProjectSubmission(incoming());
+      allow read: if isAdmin() || (incoming() != null && resource.data.participantId == request.auth.uid);
+      allow update: if isAdmin(); // Only verified coordinators can review and score projects
+      allow delete: if isAdmin();
+    }
+  }
+}

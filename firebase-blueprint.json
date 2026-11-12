@@ -1,0 +1,633 @@
+{
+  "entities": {
+    "Participant": {
+      "title": "Participant",
+      "description": "Minimal registration record for NYSC corps member exploring digital skills.",
+      "type": "object",
+      "properties": {
+        "firstName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50,
+          "description": "Participant's first name."
+        },
+        "surname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50,
+          "description": "Participant's surname."
+        },
+        "contactMethod": {
+          "type": "string",
+          "enum": ["email", "phone", "both"],
+          "description": "Selected primary contact channel."
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 25,
+          "description": "Optional contact phone or WhatsApp."
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Optional contact email address."
+        },
+        "stateCode": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Optional NYSC State Code."
+        },
+        "platoon": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          "description": "Optional orientation camp platoon number."
+        },
+        "primarySkillTrack": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Optional selected digital skill interest."
+        },
+        "skillLevel": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "not_specified"],
+          "description": "Optional current self-assessed skill level."
+        },
+        "deploymentState": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Optional deployment state."
+        },
+        "cdsGroupId": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Optional post-camp CDS group identifier."
+        },
+        "cdsGroupName": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Optional post-camp CDS group name."
+        },
+        "communityOptIn": {
+          "type": "boolean",
+          "description": "Optional separate consent for joining peer community follow-ups."
+        },
+        "marketingConsent": {
+          "type": "boolean",
+          "description": "Optional separate consent for future promotional or opportunity messages."
+        },
+        "consentTimestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when consent choices were submitted."
+        },
+        "campaignId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "description": "Event identifier."
+        },
+        "registrationId": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 40,
+          "description": "Client-generated stable tracking ID."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-validated creation timestamp."
+        }
+      },
+      "required": [
+        "firstName",
+        "surname",
+        "contactMethod",
+        "communityOptIn",
+        "marketingConsent",
+        "consentTimestamp",
+        "campaignId",
+        "registrationId",
+        "createdAt"
+      ]
+    },
+    "ChallengeSubmission": {
+      "title": "ChallengeSubmission",
+      "description": "Participant solution proposal for the AI Platoon Challenge.",
+      "type": "object",
+      "properties": {
+        "participantReference": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "State code, registration ID or anonymous ref."
+        },
+        "participantName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Submitter or team lead name."
+        },
+        "platoon": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          "description": "Selected platoon number."
+        },
+        "solutionTitle": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Proposal title."
+        },
+        "solutionSummary": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 1200,
+          "description": "Practical AI solution for a youth or community problem."
+        },
+        "actionPlan30Days": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Concrete 30-day execution milestone plan."
+        },
+        "campaignId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "description": "Event identifier."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-validated creation timestamp."
+        }
+      },
+      "required": [
+        "participantName",
+        "solutionTitle",
+        "solutionSummary",
+        "campaignId",
+        "createdAt"
+      ]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Audit record for sensitive administrative operations.",
+      "type": "object",
+      "properties": {
+        "adminEmail": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Admin who performed the sensitive action."
+        },
+        "action": {
+          "type": "string",
+          "enum": ["CSV_EXPORT", "REPORT_GENERATION", "QUIZ_RESULT_INVALIDATION", "MESSAGE_BROADCAST", "DIRECT_MESSAGE_SENT"],
+          "description": "Type of administrative action."
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Action summary and scope."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Time the action took place."
+        }
+      },
+      "required": ["adminEmail", "action", "details", "timestamp"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorised administrative users for monitoring camp registrations.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Admin email address."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "coordinator"],
+          "description": "Administrative authority level."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account registration timestamp."
+        }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Participant official quiz score record for the Platoon Performance competition.",
+      "type": "object",
+      "properties": {
+        "participantId": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 40,
+          "description": "Stable unique ID linking to the participant registration record."
+        },
+        "quizRoundId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 40,
+          "description": "Identifier for the quiz competition round."
+        },
+        "campaignId": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "description": "Campaign or event identifier."
+        },
+        "categoryId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Selected digital skills quiz category identifier."
+        },
+        "categoryName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Display name of the quiz category."
+        },
+        "attemptId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Server session identifier for the challenge attempt."
+        },
+        "timeTakenSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "Duration in seconds taken by the participant."
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Evaluated quiz score out of 10."
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "enum": [10],
+          "description": "Total number of questions in the round (strictly 10)."
+        },
+        "qualifying": {
+          "type": "boolean",
+          "description": "True if score >= 6, false otherwise."
+        },
+        "platoon": {
+          "type": "integer",
+          "enum": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          "description": "Participant registered platoon (0 represents Unassigned)."
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Submission timestamp."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["unverified", "verified", "invalidated"],
+          "description": "Verification status of the competition result."
+        },
+        "invalidationReason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Optional administrative note if result is invalidated."
+        }
+      },
+      "required": [
+        "participantId",
+        "quizRoundId",
+        "campaignId",
+        "score",
+        "totalQuestions",
+        "qualifying",
+        "platoon",
+        "submittedAt",
+        "status"
+      ]
+    },
+    "LearningProgress": {
+      "title": "LearningProgress",
+      "description": "Participant progress record for an enrolled Learning Academy course.",
+      "type": "object",
+      "properties": {
+        "participantId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64
+        },
+        "courseId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64
+        },
+        "enrolledAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastAccessedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastAccessedLessonId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "completedLessonIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "completedModuleIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "moduleCheckScores": {
+          "type": "object"
+        },
+        "finalAssessmentScore": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "finalAssessmentPassed": {
+          "type": "boolean"
+        },
+        "capstoneSubmissionId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "capstoneCompleted": {
+          "type": "boolean"
+        },
+        "courseStatus": {
+          "type": "string",
+          "enum": ["not_started", "in_progress", "completed"]
+        },
+        "progressPercentage": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "participantId",
+        "courseId",
+        "enrolledAt",
+        "lastAccessedAt",
+        "completedLessonIds",
+        "courseStatus",
+        "progressPercentage"
+      ]
+    },
+    "CourseProjectSubmission": {
+      "title": "CourseProjectSubmission",
+      "description": "Capstone project submission for an Academy course.",
+      "type": "object",
+      "properties": {
+        "submissionId": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 64
+        },
+        "participantId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64
+        },
+        "participantName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "stateCode": {
+          "type": "string",
+          "maxLength": 25
+        },
+        "platoon": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "courseId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64
+        },
+        "courseTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "projectTitle": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "projectDescription": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000
+        },
+        "submissionUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "submissionStatus": {
+          "type": "string",
+          "enum": ["submitted", "under_review", "approved", "revision_requested"]
+        },
+        "reviewerFeedback": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "reviewedBy": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "submissionId",
+        "participantId",
+        "participantName",
+        "courseId",
+        "courseTitle",
+        "projectTitle",
+        "projectDescription",
+        "submissionStatus",
+        "submittedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/participants/{participantId}": {
+      "schema": {
+        "$ref": "#/entities/Participant"
+      },
+      "description": "Store participant registration records created during camp digital day."
+    },
+    "/challengeSubmissions/{submissionId}": {
+      "schema": {
+        "$ref": "#/entities/ChallengeSubmission"
+      },
+      "description": "Store platoon AI challenge submissions."
+    },
+    "/quizResults/{resultId}": {
+      "schema": {
+        "$ref": "#/entities/QuizResult"
+      },
+      "description": "Store official Rapid-Fire Digital Quiz competition results."
+    },
+    "/learningProgress/{progressId}": {
+      "schema": {
+        "$ref": "#/entities/LearningProgress"
+      },
+      "description": "Store participant progress across Academy courses."
+    },
+    "/courseProjectSubmissions/{submissionId}": {
+      "schema": {
+        "$ref": "#/entities/CourseProjectSubmission"
+      },
+      "description": "Store capstone project submissions for Academy courses."
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator profile.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Administrator email address."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["lead_coordinator", "camp_director", "state_officer"],
+          "description": "Administrator role."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the administrator was provisioned."
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "CDSGroup": {
+      "title": "CDSGroup",
+      "description": "Post-camp Community Development Service (CDS) group created by administrators.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80,
+          "description": "Unique CDS group ID."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Official or descriptive CDS group name."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "CDS group focus area or objective."
+        },
+        "lga": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "LGA of CDS deployment."
+        },
+        "state": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "State of deployment."
+        },
+        "meetingDay": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Weekly meeting schedule."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the CDS group is currently active for selection."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp."
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Admin email who created the CDS group."
+        }
+      },
+      "required": ["name", "active", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/participants/{participantId}": {
+      "schema": {
+        "$ref": "#/entities/Participant"
+      },
+      "description": "Store participant registration records created during camp digital day."
+    },
+    "/challengeSubmissions/{submissionId}": {
+      "schema": {
+        "$ref": "#/entities/ChallengeSubmission"
+      },
+      "description": "Store platoon AI challenge submissions."
+    },
+    "/quizResults/{resultId}": {
+      "schema": {
+        "$ref": "#/entities/QuizResult"
+      },
+      "description": "Store official Rapid-Fire Digital Quiz competition results."
+    },
+    "/learningProgress/{progressId}": {
+      "schema": {
+        "$ref": "#/entities/LearningProgress"
+      },
+      "description": "Store participant progress across Academy courses."
+    },
+    "/courseProjectSubmissions/{submissionId}": {
+      "schema": {
+        "$ref": "#/entities/CourseProjectSubmission"
+      },
+      "description": "Store capstone project submissions for Academy courses."
+    },
+    "/cdsGroups/{groupId}": {
+      "schema": {
+        "$ref": "#/entities/CDSGroup"
+      },
+      "description": "Store post-camp CDS groups managed by administrators."
+    },
+    "/adminAuditLogs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/AdminAuditLog"
+      },
+      "description": "Store audit trails for sensitive administrative actions."
+    },
+    "/adminUsers/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/AdminUser"
+      },
+      "description": "Store authorized admin coordinators."
+    }
+  }
+}

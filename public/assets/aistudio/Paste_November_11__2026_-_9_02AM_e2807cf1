@@ -1,0 +1,1208 @@
+# MASTER IMPLEMENTATION PROMPT: DIGITAL CORPS HUB LEARNING ACADEMY
+
+## PROJECT OBJECTIVE
+
+Upgrade the existing Digital Corps Hub application by developing a complete, structured, category-based Learning Academy.
+
+The Learning Academy must contain six fully developed digital skills courses. Each course must align directly with its corresponding Digital Skills Quiz category and the knowledge tested by the questions in that category.
+
+This is an extension of the existing application, NOT a new application.
+
+**Do not rebuild the application, replace existing features, discard existing Firebase data, or break existing functionality.**
+
+The goal is to transform the existing "Get a Recommended Learning Track" feature into a proper learning management system (LMS).
+
+---
+
+# PART 1: INSPECT THE EXISTING APPLICATION
+
+Before writing or changing code:
+
+1. Inspect the existing React, TypeScript and Vite application.
+2. Inspect the current Firebase configuration and Firestore collections.
+3. Identify the existing Digital Skills Quiz implementation.
+4. Inspect all six quiz categories and their question banks.
+5. Identify how questions, correct answers, explanations, scores and quiz attempts are currently stored.
+6. Inspect the existing "Get a Recommended Learning Track" functionality.
+7. Inspect the user registration, authentication, participant profile and Admin Portal.
+8. Identify existing UI components and reusable layouts.
+
+Create an implementation plan before modifying the application.
+
+Reuse existing collections and components wherever possible. Do not create duplicate collections or replace working systems unnecessarily.
+
+---
+
+# PART 2: THE SIX COMPLETE LEARNING TRACKS
+
+Develop the following six courses.
+
+Every course must have:
+
+- Course title.
+- Course description.
+- Target audience.
+- Entry requirements.
+- Learning objectives.
+- Expected duration.
+- Modules.
+- Detailed lessons.
+- Practical demonstrations.
+- Hands-on exercises.
+- Module knowledge checks.
+- Assignments.
+- Final capstone project.
+- Final assessment.
+- Completion criteria.
+
+Each course should contain at least four modules and three lessons per module.
+
+This gives a minimum of 12 detailed lessons per course and 72 lessons across the six courses.
+
+Do not create empty lesson pages or placeholder text such as "Content coming soon."
+
+Write actual learner-facing course material.
+
+## COURSE 1: AI LITERACY AND AI PRODUCT BUILDING
+
+**Category:** AI & Emerging Technology
+
+**Course description:**
+
+A practical introduction to artificial intelligence, generative AI, prompt engineering and AI-assisted productivity. Participants will learn how to use accessible AI tools to solve real-world problems and build simple digital products.
+
+### Module 1: Understanding Artificial Intelligence
+
+Lesson 1.1: What Is Artificial Intelligence?
+- Meaning and applications of AI.
+- Difference between traditional software and AI.
+- Examples of AI in everyday life.
+- AI applications in Nigeria and Africa.
+
+Lesson 1.2: Types of Artificial Intelligence and Emerging Technologies
+- Machine learning.
+- Generative AI.
+- Natural language processing.
+- Computer vision.
+- Automation and emerging technologies.
+
+Lesson 1.3: Understanding Generative AI
+- How generative AI works at a basic level.
+- Text, image, audio and video generation.
+- Capabilities and limitations.
+- Common misconceptions.
+
+### Module 2: Prompt Engineering and AI Tools
+
+Lesson 2.1: Introduction to Prompt Engineering
+- What is a prompt?
+- How to communicate instructions to AI.
+- Weak versus effective prompts.
+
+Lesson 2.2: The Structure of an Effective Prompt
+- Role.
+- Task.
+- Context.
+- Instructions.
+- Format.
+- Examples and constraints.
+
+Lesson 2.3: Practical AI Tools
+- Using ChatGPT.
+- Using Google Gemini.
+- Using other accessible AI assistants.
+- Selecting the right tool for a task.
+
+### Module 3: AI for Work, Learning and Productivity
+
+Lesson 3.1: AI for Research and Learning
+- Research assistance.
+- Summarising information.
+- Study support.
+- Fact-checking AI-generated information.
+
+Lesson 3.2: AI for Content Creation
+- Writing.
+- Lesson plans.
+- Social media content.
+- Images and presentations.
+- Video scripting.
+
+Lesson 3.3: AI for Everyday Problem-Solving
+- Planning.
+- Brainstorming.
+- Administrative tasks.
+- Business and personal productivity.
+
+### Module 4: Responsible AI and Building with AI
+
+Lesson 4.1: Responsible and Ethical AI Use
+- Privacy.
+- Bias.
+- Copyright.
+- Misinformation.
+- Human oversight.
+
+Lesson 4.2: Building Simple Digital Products with AI
+- Identifying a problem.
+- Defining a solution.
+- Using AI to plan a product.
+- Building simple prototypes using no-code or AI-assisted tools.
+
+Lesson 4.3: AI Product Builder Project
+- Build a simple useful digital product.
+- Test the product.
+- Improve the user experience.
+- Present the finished solution.
+
+**Capstone project:** Build and present a simple AI-assisted digital solution to a real problem affecting students, small businesses or local communities.
+
+**Assessment:** AI concepts, prompt engineering, practical AI applications, responsible AI and product-building knowledge.
+
+---
+
+## COURSE 2: DIGITAL CAREER READINESS AND EMPLOYABILITY
+
+**Category:** Career & Employability
+
+**Course description:**
+
+A practical course that equips participants with digital career skills for employment, remote work, freelancing and professional development.
+
+### Module 1: Building Your Digital Professional Identity
+
+Lesson 1.1: Understanding the Digital Workplace
+- Digital careers.
+- Remote and hybrid work.
+- Digital professional expectations.
+
+Lesson 1.2: Building a Professional Online Presence
+- LinkedIn profile development.
+- Professional communication.
+- Online reputation.
+- Personal branding.
+
+Lesson 1.3: Creating a Digital Portfolio
+- What a portfolio is.
+- Selecting projects.
+- Showcasing skills.
+- Creating a simple online portfolio.
+
+### Module 2: CV Writing and Job Search
+
+Lesson 2.1: Creating a Professional CV
+- CV structure.
+- Personal profile.
+- Skills and experience.
+- Achievement statements.
+
+Lesson 2.2: Using Digital Platforms to Find Opportunities
+- Online job boards.
+- Company career pages.
+- Professional networks.
+- Opportunity verification.
+
+Lesson 2.3: Using AI to Improve Career Documents
+- CV drafting.
+- Cover letters.
+- Job description analysis.
+- Reviewing AI-generated applications.
+
+### Module 3: Interview and Workplace Skills
+
+Lesson 3.1: Preparing for Digital and Physical Interviews
+- Interview preparation.
+- Common questions.
+- Researching employers.
+- Communicating effectively.
+
+Lesson 3.2: Digital Communication at Work
+- Professional email.
+- Video meetings.
+- Workplace messaging.
+- Digital collaboration etiquette.
+
+Lesson 3.3: Remote Work and Professional Conduct
+- Working independently.
+- Time management.
+- Meeting deadlines.
+- Communicating progress.
+
+### Module 4: Freelancing and Career Development
+
+Lesson 4.1: Introduction to Freelancing
+- Understanding freelance work.
+- Identifying marketable skills.
+- Service packaging.
+- Finding clients.
+
+Lesson 4.2: Digital Freelancing Platforms
+- Understanding freelance marketplaces.
+- Creating professional profiles.
+- Proposals and client communication.
+- Avoiding employment scams.
+
+Lesson 4.3: Building a Career Development Plan
+- Skills assessment.
+- Career goals.
+- Continuous learning.
+- Building a professional development roadmap.
+
+**Capstone project:** Create a professional CV, optimise a LinkedIn profile, develop a digital portfolio and prepare an application for a real job or freelance opportunity.
+
+**Assessment:** Digital identity, CV development, online job search, interview preparation, remote work and freelancing.
+
+---
+
+## COURSE 3: DIGITAL ENTREPRENEURSHIP AND ONLINE BUSINESS
+
+**Category:** Digital Business & Entrepreneurship
+
+**Course description:**
+
+A practical introduction to starting, managing and growing a business using digital tools and platforms.
+
+### Module 1: Digital Entrepreneurship Fundamentals
+
+Lesson 1.1: Understanding Digital Entrepreneurship
+- What is digital entrepreneurship?
+- Digital business models.
+- Online versus traditional businesses.
+- Examples of digital businesses.
+
+Lesson 1.2: Identifying Business Opportunities
+- Identifying customer problems.
+- Market research.
+- Customer needs.
+- Validating business ideas.
+
+Lesson 1.3: Developing a Business Model
+- Value propositions.
+- Target customers.
+- Revenue streams.
+- Basic business planning.
+
+### Module 2: Building Your Digital Business
+
+Lesson 2.1: Establishing Your Online Presence
+- Business identity.
+- Social media business profiles.
+- Basic websites and landing pages.
+- Business contact information.
+
+Lesson 2.2: Digital Marketing Fundamentals
+- Content marketing.
+- Social media marketing.
+- Audience targeting.
+- Marketing calendars.
+
+Lesson 2.3: Creating Digital Marketing Content
+- Promotional writing.
+- Product photography.
+- Short-form video.
+- AI-assisted marketing content.
+
+### Module 3: Digital Sales and Customer Management
+
+Lesson 3.1: Selling Products and Services Online
+- Online sales channels.
+- Product listings.
+- Digital storefronts.
+- Customer enquiries.
+
+Lesson 3.2: Digital Payments and Transactions
+- Digital payment methods.
+- Payment confirmation.
+- Transaction records.
+- Basic fraud awareness.
+
+Lesson 3.3: Customer Service and Retention
+- Customer communication.
+- Feedback.
+- Customer relationship management.
+- Repeat business.
+
+### Module 4: Managing and Growing a Digital Business
+
+Lesson 4.1: Business Operations with Digital Tools
+- Record keeping.
+- Inventory tracking.
+- Sales records.
+- Digital organisation.
+
+Lesson 4.2: Measuring Business Performance
+- Sales indicators.
+- Customer engagement.
+- Basic financial performance.
+- Business reporting.
+
+Lesson 4.3: Growing a Sustainable Digital Business
+- Business improvement.
+- Customer acquisition.
+- Partnerships.
+- Digital growth strategy.
+
+**Capstone project:** Develop a practical digital business plan and create an online business presence with a product or service listing, marketing content and a simple sales-tracking system.
+
+**Assessment:** Business models, digital marketing, e-commerce, online payments, customer service and digital business management.
+
+---
+
+## COURSE 4: DIGITAL FOUNDATIONS, INTERNET SKILLS AND ONLINE SAFETY
+
+**Category:** Digital Literacy & Online Safety
+
+**Course description:**
+
+A foundational course designed to help participants confidently use digital devices, navigate the internet, communicate online and protect themselves from digital threats.
+
+### Module 1: Digital Foundations
+
+Lesson 1.1: Understanding Digital Devices
+- Smartphones.
+- Computers.
+- Operating systems.
+- Applications and software.
+
+Lesson 1.2: Understanding the Internet
+- How the internet works at a basic level.
+- Websites and browsers.
+- Search engines.
+- Internet connections and data.
+
+Lesson 1.3: Effective Internet Searching
+- Search techniques.
+- Search keywords.
+- Evaluating search results.
+- Finding reliable information.
+
+### Module 2: Digital Communication and Information
+
+Lesson 2.1: Email and Online Communication
+- Creating and using email.
+- Sending attachments.
+- Email etiquette.
+- Managing inboxes.
+
+Lesson 2.2: Evaluating Online Information
+- Identifying reliable sources.
+- Misinformation and disinformation.
+- Fact-checking.
+- Recognising misleading content.
+
+Lesson 2.3: Digital Citizenship
+- Responsible online behaviour.
+- Respectful communication.
+- Digital footprints.
+- Online reputation.
+
+### Module 3: Cybersecurity and Privacy
+
+Lesson 3.1: Passwords and Account Protection
+- Strong passwords.
+- Password managers.
+- Multi-factor authentication.
+- Account recovery.
+
+Lesson 3.2: Recognising Online Threats
+- Phishing.
+- Scams.
+- Malware.
+- Suspicious links and attachments.
+
+Lesson 3.3: Protecting Personal Information
+- Privacy settings.
+- Personal data.
+- Safe public Wi-Fi use.
+- Protecting sensitive documents.
+
+### Module 4: Practical Digital Safety
+
+Lesson 4.1: Safe Use of Social Media
+- Account settings.
+- Privacy controls.
+- Online interactions.
+- Reporting abuse.
+
+Lesson 4.2: Safe Digital Transactions
+- Recognising payment scams.
+- Protecting banking information.
+- Verifying digital transactions.
+- Reporting suspicious activity.
+
+Lesson 4.3: Creating Your Personal Digital Safety Plan
+- Device security checklist.
+- Account protection checklist.
+- Privacy review.
+- Incident response basics.
+
+**Capstone project:** Conduct a personal digital safety audit and develop a practical digital security checklist for an individual, student group or community.
+
+**Assessment:** Internet use, online searching, digital communication, misinformation, cybersecurity and privacy.
+
+---
+
+## COURSE 5: DIGITAL PRODUCTIVITY, GOOGLE WORKSPACE AND COLLABORATION
+
+**Category:** Productivity & Digital Tools
+
+**Course description:**
+
+A hands-on course teaching participants to use common digital productivity tools to organise work, create documents, manage information and collaborate effectively.
+
+### Module 1: Digital Productivity Foundations
+
+Lesson 1.1: Understanding Digital Productivity
+- Productivity and workflow.
+- Digital organisation.
+- Choosing the right tools.
+- Managing digital tasks.
+
+Lesson 1.2: File and Document Management
+- Files and folders.
+- File naming.
+- Cloud storage.
+- Document sharing and permissions.
+
+Lesson 1.3: Time and Task Management
+- Digital calendars.
+- Task lists.
+- Scheduling.
+- Prioritisation.
+
+### Module 2: Document and Presentation Tools
+
+Lesson 2.1: Creating Professional Documents
+- Google Docs.
+- Microsoft Word.
+- Formatting.
+- Tables and page layout.
+
+Lesson 2.2: Creating Effective Presentations
+- Google Slides.
+- Microsoft PowerPoint.
+- Slide structure.
+- Visual communication.
+
+Lesson 2.3: Creating Forms and Collecting Information
+- Google Forms.
+- Form design.
+- Response collection.
+- Basic reporting.
+
+### Module 3: Spreadsheets for Everyday Productivity
+
+Lesson 3.1: Understanding Spreadsheets
+- Rows and columns.
+- Cells and ranges.
+- Data entry.
+- Formatting.
+
+Lesson 3.2: Useful Spreadsheet Formulas
+- SUM.
+- AVERAGE.
+- COUNT.
+- IF.
+- Basic calculations.
+
+Lesson 3.3: Organising and Managing Spreadsheet Data
+- Sorting.
+- Filtering.
+- Data validation.
+- Basic conditional formatting.
+
+### Module 4: Collaboration and Workflow Automation
+
+Lesson 4.1: Cloud Collaboration
+- Shared documents.
+- Comments.
+- Version history.
+- Access permissions.
+
+Lesson 4.2: Digital Meetings and Teamwork
+- Video meetings.
+- Shared calendars.
+- Team communication.
+- Collaborative workflows.
+
+Lesson 4.3: Improving Workflows with Digital Tools
+- Repetitive tasks.
+- Basic automation concepts.
+- AI-assisted productivity.
+- Creating an efficient workflow.
+
+**Capstone project:** Build a complete digital office productivity system containing a professional document, presentation, data collection form, spreadsheet tracker and shared team workflow.
+
+**Assessment:** Document creation, presentations, forms, spreadsheet basics, file management and collaboration.
+
+---
+
+## COURSE 6: SPREADSHEET MASTERY, DATA ANALYSIS AND VISUALISATION
+
+**Category:** Data & Digital Skills
+
+**Course description:**
+
+A practical course that introduces participants to data handling, spreadsheet analysis, data interpretation and visualisation using Google Sheets and Microsoft Excel.
+
+### Module 1: Data Fundamentals
+
+Lesson 1.1: Understanding Data
+- What is data?
+- Types of data.
+- Structured and unstructured data.
+- Data in everyday decision-making.
+
+Lesson 1.2: Collecting and Organising Data
+- Data collection methods.
+- Data entry.
+- Tables and datasets.
+- Data quality.
+
+Lesson 1.3: Understanding Spreadsheet Structure
+- Workbooks and worksheets.
+- Cells, rows and columns.
+- Data types.
+- Cell references.
+
+### Module 2: Spreadsheet Skills and Formulas
+
+Lesson 2.1: Spreadsheet Formatting and Data Organisation
+- Formatting tables.
+- Sorting and filtering.
+- Freeze panes.
+- Data validation.
+
+Lesson 2.2: Essential Spreadsheet Formulas
+- SUM.
+- AVERAGE.
+- COUNT.
+- COUNTA.
+- MIN and MAX.
+- IF.
+
+Lesson 2.3: Intermediate Spreadsheet Functions
+- SUMIF.
+- COUNTIF.
+- COUNTIFS.
+- SUMIFS.
+- TRIM.
+- PROPER.
+- Basic lookup concepts.
+
+### Module 3: Data Cleaning and Analysis
+
+Lesson 3.1: Understanding Data Quality
+- Missing values.
+- Duplicate records.
+- Inconsistent formatting.
+- Data validation.
+
+Lesson 3.2: Cleaning and Preparing Data
+- Removing duplicates.
+- Standardising entries.
+- Correcting inconsistent records.
+- Preparing datasets for analysis.
+
+Lesson 3.3: Analysing Data for Decisions
+- Summarising data.
+- Comparing results.
+- Identifying trends.
+- Basic descriptive statistics.
+
+### Module 4: Data Visualisation and Reporting
+
+Lesson 4.1: Creating Charts
+- Bar charts.
+- Line charts.
+- Pie charts.
+- Choosing appropriate visualisations.
+
+Lesson 4.2: Building Simple Dashboards
+- Key performance indicators.
+- Summary tables.
+- Charts.
+- Interactive filters where appropriate.
+
+Lesson 4.3: Communicating Data Insights
+- Interpreting results.
+- Explaining findings.
+- Data storytelling.
+- Making evidence-based recommendations.
+
+**Capstone project:** Build an automated digital revenue and expense tracker for a small business, cooperative or market vendor. Include clean data, formulas, summary reports and a dashboard.
+
+**Assessment:** Data organisation, spreadsheet functions, data cleaning, analysis, visualisation and reporting.
+
+---
+
+# PART 3: CONNECT EVERY COURSE TO THE DIGITAL SKILLS QUIZ
+
+This is one of the most important technical requirements.
+
+The learning tracks must not be independent of the quiz.
+
+Create a shared learning-objective mapping system.
+
+Each quiz question should be linked to:
+
+- Category ID.
+- Learning objective ID.
+- Related course ID.
+- Related module ID.
+- Related lesson ID.
+- Difficulty level.
+- Question topic.
+
+Example:
+
+Category: AI & Emerging Technology
+
+Question topic: Prompt Engineering
+
+Learning objective: AI-PE-02
+
+Course: AI Literacy and AI Product Building
+
+Module: Module 2 – Prompt Engineering and AI Tools
+
+Lesson: Lesson 2.2 – The Structure of an Effective Prompt
+
+When a participant answers the question incorrectly, the result should identify Lesson 2.2 as a recommended learning destination.
+
+### Required mapping logic
+
+1. Inspect all existing questions in every category.
+2. Identify the knowledge area each question tests.
+3. Assign each question to a learning objective.
+4. Map the learning objective to a course module and lesson.
+5. Verify that the lesson actually teaches the tested knowledge.
+6. Identify questions without an appropriate lesson.
+7. Create or improve lesson content to close those gaps.
+
+Do not simply assign lessons based on matching keywords.
+
+The lesson must genuinely teach the concept or skill being assessed.
+
+### Important rule
+
+Every active quiz question must have at least one valid learning-objective mapping and at least one corresponding lesson.
+
+Create an administrator-facing question-to-course coverage report.
+
+The report should show:
+
+- Total active questions.
+- Questions mapped to learning objectives.
+- Questions mapped to lessons.
+- Unmapped questions.
+- Courses with incomplete lesson coverage.
+
+Do not report 100% coverage unless it has been verified.
+
+---
+
+# PART 4: IMPROVE THE RECOMMENDED LEARNING EXPERIENCE
+
+After a participant completes the quiz, display a detailed result page.
+
+Example:
+
+**Your Digital Skills Assessment**
+
+Category: Career & Employability
+
+Score: 5/10
+
+Performance: Getting There
+
+### Your strengths
+
+Identify the learning objectives where the participant answered correctly.
+
+### Areas to improve
+
+Identify the learning objectives where the participant answered incorrectly.
+
+### Recommended learning track
+
+Digital Career Readiness and Employability
+
+Description:
+
+Build practical skills in professional branding, CV writing, online job search, interview preparation, remote work and freelancing.
+
+Display:
+
+- Course duration.
+- Number of modules.
+- Number of lessons.
+- Learning objectives.
+- Course progress.
+- Start Learning button.
+
+### Personalised learning recommendations
+
+Prioritise the modules and lessons linked to the participant's incorrect answers.
+
+For example:
+
+You need additional practice in:
+- Creating professional CVs.
+- Identifying legitimate online job opportunities.
+- Understanding remote work expectations.
+
+Recommended starting point:
+
+Module 2 – CV Writing and Job Search.
+
+The participant must also be able to access the complete course, not just the recommended lessons.
+
+### Scoring rules
+
+Preserve the existing quiz scoring system.
+
+- 0–3: Keep Practising.
+- 4–5: Getting There.
+- 6–7: Qualified.
+- 8–9: Excellent.
+- 10: Outstanding.
+
+A participant who scores 9/10 should still have access to the entire course.
+
+A participant who scores 2/10 should not be blocked from learning.
+
+The learning recommendation is based on knowledge gaps, not eligibility.
+
+---
+
+# PART 5: BUILD THE LEARNING MANAGEMENT SYSTEM
+
+Create a dedicated Learning Academy section in the existing application.
+
+### Participant dashboard
+
+Display:
+
+- Welcome message.
+- Available learning tracks.
+- Recommended learning track.
+- Enrolled courses.
+- Courses in progress.
+- Completed courses.
+- Overall learning progress.
+- Recently accessed lessons.
+- Recommended next lesson.
+
+### Course overview page
+
+Every course must have:
+
+- Course title and description.
+- Course objectives.
+- Course duration.
+- Module list.
+- Lesson count.
+- Course progress.
+- Start Course or Continue Learning button.
+
+### Lesson interface
+
+Every lesson page must support:
+
+1. Lesson title.
+2. Learning objectives.
+3. Detailed explanation.
+4. Step-by-step teaching material.
+5. Examples relevant to Nigeria and African contexts.
+6. Practical demonstrations.
+7. Exercises.
+8. Downloadable resources where available.
+9. Lesson knowledge check.
+10. Mark as Complete button.
+11. Previous Lesson and Next Lesson navigation.
+
+Where suitable, include embedded video links or external learning resources.
+
+Do not invent video URLs. Only display verified resources.
+
+### Learning experience
+
+Participants should be able to:
+
+- Resume from where they stopped.
+- Mark lessons as completed.
+- Retake lesson knowledge checks.
+- Review previous modules.
+- View their progress.
+- Access the full course at any time.
+
+Use a mobile-first, responsive design suitable for affordable Android smartphones and limited internet connections.
+
+---
+
+# PART 6: ASSESSMENTS AND PRACTICAL PROJECTS
+
+Every module must have a short knowledge check.
+
+Each module assessment should contain approximately five questions.
+
+Questions should test the content actually taught in that module.
+
+Use a combination of:
+- Multiple-choice questions.
+- Practical scenario questions.
+- Short application exercises.
+
+At the end of every course, create a final assessment of approximately 15 questions.
+
+The final assessment must evaluate the complete course.
+
+### Capstone project submission
+
+Each course must have a practical final project.
+
+Provide a submission interface where participants can:
+
+- Read project instructions.
+- View assessment criteria.
+- Submit a project description.
+- Submit a project link or file, if file submission is supported.
+- View submission status.
+- Receive feedback where an authorised reviewer is available.
+
+Do not claim projects have been reviewed automatically unless a functioning review system exists.
+
+### Completion criteria
+
+A course is complete when the participant:
+
+1. Completes all required lessons.
+2. Completes all module assessments.
+3. Passes the final assessment using a configurable pass mark.
+4. Completes the capstone project requirement if the course requires it.
+
+Allow administrators to configure the pass mark and completion requirements.
+
+---
+
+# PART 7: FIRESTORE DATA ARCHITECTURE
+
+Inspect the current Firestore structure before implementing this design.
+
+Reuse existing structures where appropriate.
+
+Suggested logical data model:
+
+### quizCategories/{categoryId}
+
+- categoryId
+- title
+- description
+- active
+
+### learningTracks/{trackId}
+
+- trackId
+- categoryId
+- title
+- description
+- learningObjectives
+- duration
+- moduleCount
+- lessonCount
+- active
+- version
+
+### learningModules/{moduleId}
+
+- moduleId
+- trackId
+- title
+- description
+- sequence
+- learningObjectiveIds
+
+### learningLessons/{lessonId}
+
+- lessonId
+- moduleId
+- trackId
+- title
+- introduction
+- learningObjectives
+- lessonContent
+- examples
+- practicalExercise
+- resources
+- sequence
+- estimatedDuration
+- active
+
+### quizLearningMappings/{mappingId}
+
+- questionId
+- categoryId
+- learningObjectiveId
+- trackId
+- moduleId
+- lessonId
+
+### learningProgress/{progressId}
+
+- participantId
+- trackId
+- completedLessonIds
+- completedModuleIds
+- assessmentResults
+- courseStatus
+- progressPercentage
+- lastAccessedAt
+- updatedAt
+
+### courseProjectSubmissions/{submissionId}
+
+- participantId
+- trackId
+- projectTitle
+- projectDescription
+- submissionUrl
+- submissionStatus
+- submittedAt
+- reviewerFeedback
+
+Use appropriate document IDs and avoid duplicate records.
+
+Do not create large documents containing entire courses if doing so creates Firestore document-size or performance problems.
+
+Keep course content structured and load it in manageable units.
+
+---
+
+# PART 8: ADMIN PORTAL AND COURSE MANAGEMENT
+
+Extend the existing Admin Portal.
+
+Create a Learning Academy Management section.
+
+Administrators should be able to:
+
+1. View all six learning tracks.
+2. View course modules and lessons.
+3. Add and edit course content.
+4. Activate or deactivate courses.
+5. Add and edit learning objectives.
+6. Map quiz questions to learning objectives and lessons.
+7. View unmapped questions.
+8. View course completion statistics.
+9. View participant progress.
+10. View assessment results.
+11. Review project submissions where reviewer access is authorised.
+
+### Admin analytics
+
+Display:
+
+- Total course enrolments.
+- Unique learners.
+- Active learners.
+- Completed courses.
+- Incomplete courses.
+- Average progress.
+- Assessment pass rates.
+- Course popularity.
+- Module completion rates.
+- Lesson completion rates.
+
+Provide category filters and CSV export for authorised administrators.
+
+Do not expose participants' private information to unauthorised users.
+
+---
+
+# PART 9: SECURITY AND FIREBASE COST OPTIMISATION
+
+Security must be built into the implementation.
+
+- Require authentication for private learning progress.
+- Participants can only read and update their own progress.
+- Administrators must have verified server-side roles or custom claims.
+- Do not rely on hidden frontend buttons or routes for security.
+- Protect administrator course-management operations.
+- Protect quiz answers and official assessment scoring.
+- Validate assessment submissions on a trusted backend where appropriate.
+- Validate lesson completion and course completion rules.
+- Prevent participants from editing their own official scores or granting themselves completion status.
+- Validate project submissions and uploaded files.
+- Do not place service-account keys or private API credentials in frontend code.
+
+### Cost optimisation
+
+- Load course lists efficiently.
+- Load lessons only when needed.
+- Avoid continuous Firestore listeners where not necessary.
+- Avoid polling.
+- Avoid unnecessary writes for every click.
+- Save progress at sensible milestones.
+- Use pagination for large admin reports.
+- Use summary documents or trusted aggregation for analytics.
+- Avoid duplicate course and question reads.
+
+Do not introduce expensive infrastructure without a clear requirement.
+
+---
+
+# PART 10: USER INTERFACE AND EXPERIENCE
+
+Maintain the existing Digital Corps Hub visual identity.
+
+Improve the user interface to feel like a modern, practical digital learning platform.
+
+Use:
+
+- Clear course cards.
+- Distinct category icons.
+- Consistent colours.
+- Progress indicators.
+- Module navigation.
+- Lesson completion indicators.
+- Assessment feedback.
+- Clear Start Learning and Continue Learning buttons.
+
+Make the interface responsive on:
+- Android smartphones.
+- iPhones.
+- Tablets.
+- Desktop computers.
+
+Ensure good loading performance and readable text on small screens.
+
+Avoid overwhelming users with too many controls.
+
+---
+
+# PART 11: QUALITY ASSURANCE AND TESTING
+
+Test the complete experience.
+
+### Quiz-to-course integration
+
+- Select each of the six categories.
+- Complete a quiz in each category.
+- Verify the correct course is recommended.
+- Verify incorrect answers map to relevant lessons.
+- Verify correct answers are not unnecessarily recommended as knowledge gaps.
+- Verify every active question has valid course coverage.
+
+### Learning experience
+
+- Open each course.
+- Open all modules.
+- Open all lessons.
+- Complete lessons.
+- Take module assessments.
+- Submit final assessments.
+- Verify progress tracking.
+- Verify course completion rules.
+- Verify learners can resume courses.
+
+### Security
+
+- Test participant access to their own progress.
+- Test attempts to access another participant's progress.
+- Test unauthorised course editing.
+- Test administrator permissions.
+- Test direct API and Firestore access.
+- Verify participants cannot forge completion or assessment results.
+
+### Regression testing
+
+Confirm that existing features still work:
+
+- Registration and login.
+- AI Platoon Challenge.
+- Digital Opportunities.
+- Starter Toolkit.
+- Community.
+- FCMB activation.
+- Rapid-Fire Digital Skills Quiz.
+- Admin Portal.
+- Platoon Performance Tracker.
+
+Do not replace working features with mock data.
+
+---
+
+# PART 12: IMPLEMENTATION STRATEGY
+
+Implement in phases rather than attempting a risky full rewrite.
+
+### Phase 1: Existing system inspection
+
+Inspect the code, quiz questions, Firebase schema and current recommendation feature.
+
+Produce a short implementation plan.
+
+### Phase 2: Course content and question mapping
+
+Create the six course structures, modules, lessons and learning objectives.
+
+Map every existing active quiz question to the appropriate lesson.
+
+Generate a coverage report.
+
+### Phase 3: Learning Academy interface
+
+Build course catalogue, course pages, module navigation and lesson pages.
+
+### Phase 4: Quiz recommendation integration
+
+Connect quiz results to the correct course and personalised learning recommendations.
+
+### Phase 5: Progress and assessment
+
+Implement lesson progress, module assessments, final assessments and capstone submissions.
+
+### Phase 6: Admin Portal
+
+Implement course management, question mapping, learner analytics and project review.
+
+### Phase 7: Security and testing
+
+Test Firebase rules, backend validation, application security and all existing features.
+
+---
+
+# FINAL DELIVERY REQUIREMENTS
+
+When implementation is complete, provide a report containing:
+
+1. Existing files inspected.
+2. New files created.
+3. Existing files modified.
+4. Six courses created.
+5. Total modules created.
+6. Total lessons created.
+7. Actual course content generated.
+8. Number of quiz questions mapped.
+9. Number of unmapped questions.
+10. Question-to-lesson coverage percentage.
+11. Firestore changes.
+12. Backend functions added or modified.
+13. Security rules changed.
+14. Tests executed and their actual results.
+15. Any outstanding issues.
+
+Do not claim a feature is complete simply because a screen has been created.
+
+A feature is complete only when its functionality works and has been tested.
+
+If the implementation is too large for one pass, complete it phase by phase, preserving working functionality and clearly identifying what remains.
+
+**FINAL PRODUCT GOAL:**
+
+Digital Corps Hub should become a practical digital skills learning platform where a participant can:
+
+**Choose a digital skills category → Take a quiz → Discover strengths and knowledge gaps → Receive the matching full course → Learn through structured modules and lessons → Practise with real-world assignments → Complete a capstone project → Demonstrate their acquired skills.**
+
+The six learning tracks must be connected to the actual quiz question bank, not merely displayed as unrelated courses.

@@ -1,0 +1,6 @@
+{
+  "name": "Digital Corps Hub",
+  "description": "Mobile-first, ultra-lightweight digital empowerment portal and toolkit for Nigerian NYSC corps members.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
