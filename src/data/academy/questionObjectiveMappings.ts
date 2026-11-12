@@ -1,4 +1,8 @@
-import { QuestionObjectiveMapping } from '../../types';
+import {
+  QuestionObjectiveMapping,
+  QuizQuestionGapRecommendation,
+  QuizReviewItem
+} from '../../types';
 
 /**
  * 100% Comprehensive Question-to-Course Mapping
@@ -735,7 +739,10 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
   },
 
   // =========================================================================
-  // 3. DIGITAL BUSINESS & ENTREPRENEURSHIP (biz-01 to biz-30) -> Course 3
+  // 3. DIGITAL BUSINESS & ENTREPRENEURSHIP (biz-01 to biz-30) -> Dual-Course
+  //    Maps to:
+  //    - Course 3A: Digital Entrepreneurship and Online Business (foundation_business_model)
+  //    - Course 3B: Grow Your Business Online (marketing_growth_execution)
   // =========================================================================
   {
     questionId: 'biz-01',
@@ -747,7 +754,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_1',
     lessonTitle: 'Understanding Digital Entrepreneurship and Business Models',
     difficulty: 'beginner',
-    questionTopic: 'Digital vs. Brick-and-Mortar Commerce'
+    questionTopic: 'Digital vs. Brick-and-Mortar Commerce',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_1',
+    secondaryLessonTitle: 'Understanding the Digital Business Landscape'
   },
   {
     questionId: 'biz-02',
@@ -759,7 +771,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_2',
     lessonTitle: 'Identifying Business Opportunities and Market Validation',
     difficulty: 'beginner',
-    questionTopic: 'Validating Customer Demand (Pre-orders)'
+    questionTopic: 'Validating Customer Demand (Pre-orders)',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_1',
+    secondaryLessonTitle: 'Understanding the Digital Business Landscape'
   },
   {
     questionId: 'biz-03',
@@ -771,7 +788,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_3',
     lessonTitle: 'Developing a Viable Business Model and Unit Economics',
     difficulty: 'beginner',
-    questionTopic: 'Unit Economics & Net Margin'
+    questionTopic: 'Unit Economics & Net Margin',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_1',
+    secondaryLessonTitle: 'Tracking Business and Marketing Performance'
   },
   {
     questionId: 'biz-04',
@@ -783,7 +805,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_1',
     lessonTitle: 'Selling Products and Services Online: The Conversion Funnel',
     difficulty: 'beginner',
-    questionTopic: 'Transparency vs. "DM for Price"'
+    questionTopic: 'Transparency vs. "DM for Price"',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_3',
+    secondaryLessonTitle: 'Developing Your Value Proposition and Business Identity'
   },
   {
     questionId: 'biz-05',
@@ -795,7 +822,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_2',
     lessonTitle: 'Digital Payments: Paystack, Flutterwave, and Fake Alert Protection',
     difficulty: 'beginner',
-    questionTopic: 'Fake Bank Transfer Alerts & Verification'
+    questionTopic: 'Fake Bank Transfer Alerts & Verification',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_2',
+    secondaryLessonTitle: 'Online Selling, Payments and Order Management'
   },
   {
     questionId: 'biz-06',
@@ -807,7 +839,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_1',
     lessonTitle: 'Setting Up Professional Storefronts: WhatsApp Business and Landing Pages',
     difficulty: 'beginner',
-    questionTopic: 'WhatsApp Business Quick Replies'
+    questionTopic: 'WhatsApp Business Quick Replies',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_2',
+    secondaryLessonId: 'lesson_gyb_2_2',
+    secondaryLessonTitle: 'WhatsApp Business for Customer Engagement'
   },
   {
     questionId: 'biz-07',
@@ -819,7 +856,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_2',
     lessonTitle: 'Digital Marketing Fundamentals: Content Marketing and Social Media',
     difficulty: 'beginner',
-    questionTopic: 'The 3-Second Hook Rule'
+    questionTopic: 'The 3-Second Hook Rule',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_3',
+    secondaryLessonId: 'lesson_gyb_3_2',
+    secondaryLessonTitle: 'Creating Business Content with Canva and AI'
   },
   {
     questionId: 'biz-08',
@@ -831,7 +873,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_3',
     lessonTitle: 'Creating Compelling Marketing Assets with Smartphone Photography and AI',
     difficulty: 'beginner',
-    questionTopic: 'Natural Lighting & Product Backdrops'
+    questionTopic: 'Natural Lighting & Product Backdrops',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_3',
+    secondaryLessonId: 'lesson_gyb_3_2',
+    secondaryLessonTitle: 'Creating Business Content with Canva and AI'
   },
   {
     questionId: 'biz-09',
@@ -843,7 +890,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_1',
     lessonTitle: 'Business Operations with Digital Tools: Record Keeping and Inventory',
     difficulty: 'beginner',
-    questionTopic: 'Separating Business & Personal Accounts'
+    questionTopic: 'Separating Business & Personal Accounts',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_2',
+    secondaryLessonTitle: 'Online Selling, Payments and Order Management'
   },
   {
     questionId: 'biz-10',
@@ -855,7 +907,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_3',
     lessonTitle: 'Customer Service, Retention, and Building Repeat Business',
     difficulty: 'beginner',
-    questionTopic: 'Customer Lifetime Value (LTV)'
+    questionTopic: 'Customer Lifetime Value (LTV)',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_3',
+    secondaryLessonTitle: 'Customer Service and Retention'
   },
   {
     questionId: 'biz-11',
@@ -867,7 +924,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_3',
     lessonTitle: 'Scaling a Sustainable Digital Business: CAC Registration, Partnerships, and Growth',
     difficulty: 'beginner',
-    questionTopic: 'CAC Business Registration'
+    questionTopic: 'CAC Business Registration',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_3',
+    secondaryLessonTitle: 'Scaling Sustainably and Planning Long-Term Growth'
   },
   {
     questionId: 'biz-12',
@@ -879,7 +941,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_2',
     lessonTitle: 'Measuring Business Performance and Financial Metrics',
     difficulty: 'beginner',
-    questionTopic: 'Gross Profit vs. Net Profit'
+    questionTopic: 'Gross Profit vs. Net Profit',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_1',
+    secondaryLessonTitle: 'Tracking Business and Marketing Performance'
   },
   {
     questionId: 'biz-13',
@@ -891,7 +958,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_2',
     lessonTitle: 'Digital Payments: Paystack, Flutterwave, and Fake Alert Protection',
     difficulty: 'intermediate',
-    questionTopic: 'Paystack/Flutterwave Automated Settlement'
+    questionTopic: 'Paystack/Flutterwave Automated Settlement',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_2',
+    secondaryLessonTitle: 'Online Selling, Payments and Order Management'
   },
   {
     questionId: 'biz-14',
@@ -903,7 +975,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_2',
     lessonTitle: 'Measuring Business Performance and Financial Metrics',
     difficulty: 'intermediate',
-    questionTopic: 'Return on Ad Spend (ROAS)'
+    questionTopic: 'Return on Ad Spend (ROAS)',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_4',
+    secondaryLessonId: 'lesson_gyb_4_2',
+    secondaryLessonTitle: 'Introduction to Paid Digital Advertising'
   },
   {
     questionId: 'biz-15',
@@ -915,7 +992,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_1',
     lessonTitle: 'Selling Products and Services Online: The Conversion Funnel',
     difficulty: 'intermediate',
-    questionTopic: 'Payment-on-Delivery (POD) Risk Mitigation'
+    questionTopic: 'Payment-on-Delivery (POD) Risk Mitigation',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_2',
+    secondaryLessonTitle: 'Online Selling, Payments and Order Management'
   },
   {
     questionId: 'biz-16',
@@ -927,7 +1009,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_2',
     lessonTitle: 'Digital Marketing Fundamentals: Content Marketing and Social Media',
     difficulty: 'intermediate',
-    questionTopic: 'Content Funnel: Top, Middle, Bottom'
+    questionTopic: 'Content Funnel: Top, Middle, Bottom',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_3',
+    secondaryLessonId: 'lesson_gyb_3_1',
+    secondaryLessonTitle: 'Understanding Content Marketing'
   },
   {
     questionId: 'biz-17',
@@ -939,7 +1026,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_1',
     lessonTitle: 'Setting Up Professional Storefronts: WhatsApp Business and Landing Pages',
     difficulty: 'intermediate',
-    questionTopic: '1-Page Landing Pages (Carrd/Mainstack)'
+    questionTopic: '1-Page Landing Pages (Carrd/Mainstack)',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_2',
+    secondaryLessonId: 'lesson_gyb_2_1',
+    secondaryLessonTitle: 'Creating a Professional Social Media Business Presence'
   },
   {
     questionId: 'biz-18',
@@ -951,7 +1043,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_2',
     lessonTitle: 'Identifying Business Opportunities and Market Validation',
     difficulty: 'intermediate',
-    questionTopic: 'Social Listening & Customer Complaints'
+    questionTopic: 'Social Listening & Customer Complaints',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_2',
+    secondaryLessonTitle: 'Identifying Your Target Customers'
   },
   {
     questionId: 'biz-19',
@@ -963,7 +1060,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_3',
     lessonTitle: 'Scaling a Sustainable Digital Business: CAC Registration, Partnerships, and Growth',
     difficulty: 'intermediate',
-    questionTopic: 'Strategic Cross-Promotions'
+    questionTopic: 'Strategic Cross-Promotions',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_4',
+    secondaryLessonId: 'lesson_gyb_4_1',
+    secondaryLessonTitle: 'Organic Digital Marketing Strategies'
   },
   {
     questionId: 'biz-20',
@@ -975,7 +1077,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_3',
     lessonTitle: 'Developing a Viable Business Model and Unit Economics',
     difficulty: 'intermediate',
-    questionTopic: 'Unique Value Proposition (UVP)'
+    questionTopic: 'Unique Value Proposition (UVP)',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_3',
+    secondaryLessonTitle: 'Developing Your Value Proposition and Business Identity'
   },
   {
     questionId: 'biz-21',
@@ -987,7 +1094,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_1',
     lessonTitle: 'Business Operations with Digital Tools: Record Keeping and Inventory',
     difficulty: 'intermediate',
-    questionTopic: 'Low Stock Alerts & Inventory Shrinkage'
+    questionTopic: 'Low Stock Alerts & Inventory Shrinkage',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_3',
+    secondaryLessonTitle: 'Scaling Sustainably and Planning Long-Term Growth'
   },
   {
     questionId: 'biz-22',
@@ -999,7 +1111,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_3',
     lessonTitle: 'Customer Service, Retention, and Building Repeat Business',
     difficulty: 'intermediate',
-    questionTopic: 'Graceful Complaint Resolution'
+    questionTopic: 'Graceful Complaint Resolution',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_3',
+    secondaryLessonTitle: 'Customer Service and Retention'
   },
   {
     questionId: 'biz-23',
@@ -1011,7 +1128,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_2_3',
     lessonTitle: 'Creating Compelling Marketing Assets with Smartphone Photography and AI',
     difficulty: 'intermediate',
-    questionTopic: 'AI Copywriting Prompts for E-Commerce'
+    questionTopic: 'AI Copywriting Prompts for E-Commerce',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_3',
+    secondaryLessonId: 'lesson_gyb_3_2',
+    secondaryLessonTitle: 'Creating Business Content with Canva and AI'
   },
   {
     questionId: 'biz-24',
@@ -1023,7 +1145,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_2',
     lessonTitle: 'Measuring Business Performance and Financial Metrics',
     difficulty: 'intermediate',
-    questionTopic: 'Customer Churn Monitoring'
+    questionTopic: 'Customer Churn Monitoring',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_2',
+    secondaryLessonTitle: 'Using Data to Improve Sales and Marketing'
   },
   {
     questionId: 'biz-25',
@@ -1035,7 +1162,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_2',
     lessonTitle: 'Measuring Business Performance and Financial Metrics',
     difficulty: 'advanced',
-    questionTopic: 'Breakeven ROAS Calculation'
+    questionTopic: 'Breakeven ROAS Calculation',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_4',
+    secondaryLessonId: 'lesson_gyb_4_2',
+    secondaryLessonTitle: 'Introduction to Paid Digital Advertising'
   },
   {
     questionId: 'biz-26',
@@ -1047,7 +1179,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_3',
     lessonTitle: 'Scaling a Sustainable Digital Business: CAC Registration, Partnerships, and Growth',
     difficulty: 'advanced',
-    questionTopic: 'Finance Act Tax Exemptions for Small Businesses'
+    questionTopic: 'Finance Act Tax Exemptions for Small Businesses',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_3',
+    secondaryLessonTitle: 'Scaling Sustainably and Planning Long-Term Growth'
   },
   {
     questionId: 'biz-27',
@@ -1059,7 +1196,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_2',
     lessonTitle: 'Digital Payments: Paystack, Flutterwave, and Fake Alert Protection',
     difficulty: 'advanced',
-    questionTopic: 'Webhook Verification in Fintech'
+    questionTopic: 'Webhook Verification in Fintech',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_2',
+    secondaryLessonTitle: 'Online Selling, Payments and Order Management'
   },
   {
     questionId: 'biz-28',
@@ -1071,7 +1213,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_1_2',
     lessonTitle: 'Identifying Business Opportunities and Market Validation',
     difficulty: 'advanced',
-    questionTopic: 'Smoke Testing & Landing Page Pre-Orders'
+    questionTopic: 'Smoke Testing & Landing Page Pre-Orders',
+    recommendedTrackFocus: 'foundation_business_model',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_1',
+    secondaryLessonId: 'lesson_gyb_1_1',
+    secondaryLessonTitle: 'Understanding the Digital Business Landscape'
   },
   {
     questionId: 'biz-29',
@@ -1083,7 +1230,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_3_3',
     lessonTitle: 'Customer Service, Retention, and Building Repeat Business',
     difficulty: 'advanced',
-    questionTopic: 'Automated Post-Purchase WhatsApp Sequences'
+    questionTopic: 'Automated Post-Purchase WhatsApp Sequences',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_5',
+    secondaryLessonId: 'lesson_gyb_5_3',
+    secondaryLessonTitle: 'Customer Service and Retention'
   },
   {
     questionId: 'biz-30',
@@ -1095,7 +1247,12 @@ export const QUESTION_OBJECTIVE_MAPPINGS: QuestionObjectiveMapping[] = [
     lessonId: 'lesson_ent_4_3',
     lessonTitle: 'Scaling a Sustainable Digital Business: CAC Registration, Partnerships, and Growth',
     difficulty: 'advanced',
-    questionTopic: 'Omnichannel Expansion (Jumia/Konga)'
+    questionTopic: 'Omnichannel Expansion (Jumia/Konga)',
+    recommendedTrackFocus: 'marketing_growth_execution',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryModuleId: 'mod_gyb_6',
+    secondaryLessonId: 'lesson_gyb_6_3',
+    secondaryLessonTitle: 'Scaling Sustainably and Planning Long-Term Growth'
   },
 
   // =========================================================================
@@ -2252,3 +2409,349 @@ export function generateQuestionCoverageReport(): QuestionCoverageReport {
     categoryBreakdown
   };
 }
+
+export interface QuizCourseRecommendationResult {
+  categoryId: string;
+  primaryCourseId: string;
+  primaryCourseTitle: string;
+  secondaryCourseId?: string;
+  secondaryCourseTitle?: string;
+  rationale: string;
+  focusDetected: 'foundation_business_model' | 'marketing_growth_execution' | 'standard_category_track';
+  priorityLessons: {
+    lessonId: string;
+    lessonTitle: string;
+    moduleId: string;
+    topic: string;
+  }[];
+  metricsSummary?: {
+    foundationMissed: number;
+    foundationTotal: number;
+    marketingMissed: number;
+    marketingTotal: number;
+  };
+}
+
+const DEFAULT_CATEGORY_COURSES: Record<string, { courseId: string; title: string }> = {
+  ai_emerging_tech: {
+    courseId: 'course_ai_literacy',
+    title: 'AI Literacy, Prompt Engineering & Practical Deployment'
+  },
+  career_employability: {
+    courseId: 'course_career_readiness',
+    title: 'Digital Career Readiness, Remote Work & Freelancing'
+  },
+  digital_business_entrepreneurship: {
+    courseId: 'course_digital_entrepreneurship',
+    title: 'Digital Entrepreneurship and Online Business'
+  },
+  digital_literacy_safety: {
+    courseId: 'course_digital_foundations',
+    title: 'Digital Foundations, Productivity & Cybersecurity'
+  },
+  productivity_digital_tools: {
+    courseId: 'course_digital_productivity',
+    title: 'Workplace Digital Productivity & Cloud Collaboration'
+  },
+  data_digital_skills: {
+    courseId: 'course_spreadsheet_mastery',
+    title: 'Data Fluency, Spreadsheets & Business Analytics'
+  }
+};
+
+/**
+ * Recommends the most relevant Academy course after a quiz attempt.
+ * For 'digital_business_entrepreneurship', evaluates missed questions & topic gaps
+ * between foundation/planning/unit economics ('course_digital_entrepreneurship')
+ * and marketing/presence/acquisition/conversion/tracking ('grow-your-business-online').
+ */
+export function recommendCourseForQuizResult(
+  categoryId: string,
+  review: QuizReviewItem[] = []
+): QuizCourseRecommendationResult {
+  if (categoryId !== 'digital_business_entrepreneurship') {
+    const fallback = DEFAULT_CATEGORY_COURSES[categoryId] || DEFAULT_CATEGORY_COURSES.digital_literacy_safety;
+    const missedLessons: QuizCourseRecommendationResult['priorityLessons'] = [];
+    const seenLessons = new Set<string>();
+
+    for (const item of review) {
+      if (!item.isCorrect) {
+        const m = getMappingByQuestionId(item.questionId);
+        if (m && !seenLessons.has(m.lessonId)) {
+          seenLessons.add(m.lessonId);
+          missedLessons.push({
+            lessonId: m.lessonId,
+            lessonTitle: m.lessonTitle,
+            moduleId: m.moduleId,
+            topic: m.questionTopic
+          });
+        }
+      }
+    }
+
+    return {
+      categoryId,
+      primaryCourseId: fallback.courseId,
+      primaryCourseTitle: fallback.title,
+      rationale:
+        missedLessons.length > 0
+          ? `Based on ${missedLessons.length} priority skill area(s) identified in your quiz review, this track directly targets your next practical milestones.`
+          : 'Great foundation! Continue into this practical Academy track to earn your completion and capstone credential.',
+      focusDetected: 'standard_category_track',
+      priorityLessons: missedLessons.slice(0, 4)
+    };
+  }
+
+  let foundationTotal = 0;
+  let foundationMissed = 0;
+  let marketingTotal = 0;
+  let marketingMissed = 0;
+
+  const foundationPriority: QuizCourseRecommendationResult['priorityLessons'] = [];
+  const marketingPriority: QuizCourseRecommendationResult['priorityLessons'] = [];
+  const seenFoundation = new Set<string>();
+  const seenMarketing = new Set<string>();
+
+  for (const item of review) {
+    const m = getMappingByQuestionId(item.questionId);
+    if (!m) continue;
+
+    if (m.recommendedTrackFocus === 'foundation_business_model') {
+      foundationTotal++;
+      if (!item.isCorrect) {
+        foundationMissed++;
+        if (!seenFoundation.has(m.lessonId)) {
+          seenFoundation.add(m.lessonId);
+          foundationPriority.push({
+            lessonId: m.lessonId,
+            lessonTitle: m.lessonTitle,
+            moduleId: m.moduleId,
+            topic: m.questionTopic
+          });
+        }
+      }
+    } else {
+      marketingTotal++;
+      if (!item.isCorrect) {
+        marketingMissed++;
+        if (m.secondaryLessonId && m.secondaryLessonTitle && !seenMarketing.has(m.secondaryLessonId)) {
+          seenMarketing.add(m.secondaryLessonId);
+          marketingPriority.push({
+            lessonId: m.secondaryLessonId,
+            lessonTitle: m.secondaryLessonTitle,
+            moduleId: m.secondaryModuleId || 'mod_gyb_1',
+            topic: m.questionTopic
+          });
+        }
+      }
+    }
+  }
+
+  const foundationErrorRate = foundationTotal > 0 ? foundationMissed / foundationTotal : 0;
+  const marketingErrorRate = marketingTotal > 0 ? marketingMissed / marketingTotal : 0;
+  const totalCorrect = review.filter((r) => r.isCorrect).length;
+  const totalQuestions = review.length || 15;
+  const highOverallScore = totalCorrect / totalQuestions >= 0.75;
+
+  // Recommend 'grow-your-business-online' when:
+  // 1) Marketing/acquisition/conversion/tracking error rate >= foundation error rate (and at least 1 marketing miss or zero foundation misses), OR
+  // 2) Learner scored strongly overall (>=75%) and is ready to execute practical marketing & customer growth.
+  const pickGrowTrack =
+    (marketingMissed > 0 && marketingErrorRate >= foundationErrorRate) ||
+    (foundationMissed === 0 && marketingMissed === 0 && highOverallScore) ||
+    (marketingErrorRate > foundationErrorRate);
+
+  if (pickGrowTrack) {
+    const priorityLessons =
+      marketingPriority.length > 0
+        ? marketingPriority.slice(0, 4)
+        : [
+            {
+              lessonId: 'lesson_gyb_2_2',
+              lessonTitle: 'WhatsApp Business for Customer Engagement',
+              moduleId: 'mod_gyb_2',
+              topic: 'Customer Engagement & Catalogues'
+            },
+            {
+              lessonId: 'lesson_gyb_4_1',
+              lessonTitle: 'Organic Digital Marketing Strategies',
+              moduleId: 'mod_gyb_4',
+              topic: 'Customer Acquisition'
+            },
+            {
+              lessonId: 'lesson_gyb_5_1',
+              lessonTitle: 'Understanding the Customer Journey and Sales Funnel',
+              moduleId: 'mod_gyb_5',
+              topic: 'Enquiry-to-Sale Conversion'
+            }
+          ];
+
+    const rationale =
+      marketingMissed > 0
+        ? `Your quiz responses show priority growth opportunities in digital marketing, customer acquisition, online selling, or performance tracking (${marketingMissed}/${marketingTotal || 1} growth questions missed vs. ${foundationMissed}/${foundationTotal || 1} planning questions).`
+        : 'Strong entrepreneurial fundamentals! Take the next step with practical digital marketing, customer acquisition, conversion scripts, and weekly growth tracking.';
+
+    return {
+      categoryId,
+      primaryCourseId: 'grow-your-business-online',
+      primaryCourseTitle: 'Grow Your Business Online',
+      secondaryCourseId: 'course_digital_entrepreneurship',
+      secondaryCourseTitle: 'Digital Entrepreneurship and Online Business',
+      rationale,
+      focusDetected: 'marketing_growth_execution',
+      priorityLessons,
+      metricsSummary: {
+        foundationMissed,
+        foundationTotal,
+        marketingMissed,
+        marketingTotal
+      }
+    };
+  }
+
+  return {
+    categoryId,
+    primaryCourseId: 'course_digital_entrepreneurship',
+    primaryCourseTitle: 'Digital Entrepreneurship and Online Business',
+    secondaryCourseId: 'grow-your-business-online',
+    secondaryCourseTitle: 'Grow Your Business Online',
+    rationale: `Your quiz responses indicate key opportunities to strengthen core business planning, idea validation, unit economics, and CAC/financial fundamentals (${foundationMissed}/${foundationTotal || 1} foundation questions missed). You can also explore Grow Your Business Online at any time.`,
+    focusDetected: 'foundation_business_model',
+    priorityLessons: foundationPriority.slice(0, 4),
+    metricsSummary: {
+      foundationMissed,
+      foundationTotal,
+      marketingMissed,
+      marketingTotal
+    }
+  };
+}
+
+/**
+ * Curriculum gap recommendations for Admins reviewing Digital Business & Entrepreneurship
+ * quiz coverage. Preserves the existing 30 active QUESTION_BANK items intact while
+ * flagging new topics introduced in Grow Your Business Online.
+ */
+export const RECOMMENDED_ADDITIONAL_BIZ_QUESTIONS: QuizQuestionGapRecommendation[] = [
+  {
+    suggestedId: 'biz-gap-01',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_1',
+    targetLessonId: 'lesson_gyb_1_2',
+    topicGap: 'Customer Personas & Pain-Point Segmentation',
+    difficulty: 'beginner',
+    suggestedQuestionText:
+      'Why is building a concrete Nigerian customer persona more effective than targeting "everyone with a smartphone"?',
+    suggestedOptions: [
+      'Because focusing on specific buyer needs, budget range, and platforms sharpens product messaging and prevents wasted marketing effort',
+      'Because Nigerian social networks forbid selling to more than 50 people',
+      'Because personas replace the need for clear product pricing',
+      'Because only luxury brands need to understand customers'
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Targeting specific buyer pain points and budget tiers ensures your content, channel choice, and pricing resonate immediately.'
+  },
+  {
+    suggestedId: 'biz-gap-02',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_2',
+    targetLessonId: 'lesson_gyb_2_3',
+    topicGap: 'Google Business Profile Eligibility & Online-Only Alternatives',
+    difficulty: 'intermediate',
+    suggestedQuestionText:
+      'Which approach is recommended for a 100% online home baker who does not have customer signage or walk-in hours for a Google Business Profile storefront?',
+    suggestedOptions: [
+      'Register a fake mall shop address in another city',
+      'Avoid falsifying storefront details; use legitimate service-area settings only if eligible, alongside WhatsApp Business, Instagram Search SEO, and a landing page',
+      'Copy a competitor’s Google Maps pin',
+      'Avoid listing any contact details online'
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Using authentic digital directories and social SEO keeps your brand compliant and prevents Google suspension.'
+  },
+  {
+    suggestedId: 'biz-gap-03',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_3',
+    targetLessonId: 'lesson_gyb_3_3',
+    topicGap: 'Canva Promotional Design & 7-Day Content Calendar Pillars',
+    difficulty: 'beginner',
+    suggestedQuestionText:
+      'What is the main advantage of planning a 7-day social media content calendar around 4 content pillars?',
+    suggestedOptions: [
+      'It balances educational, trust-building, behind-the-scenes, and promotional posts while eliminating daily posting guesswork',
+      'It requires paying Canva monthly in USD',
+      'It forces businesses to hide product prices',
+      'It removes all calls to action from captions'
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Structured content pillars maintain audience trust and enable batch creation during limited weekly hours.'
+  },
+  {
+    suggestedId: 'biz-gap-04',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_4',
+    targetLessonId: 'lesson_gyb_4_2',
+    topicGap: 'Meta Ad Campaign Objectives & Local Radius Targeting',
+    difficulty: 'intermediate',
+    suggestedQuestionText:
+      'For a small Nigerian vendor taking orders in chat, which Meta Ads Manager campaign objective aligns directly with generating WhatsApp enquiries?',
+    suggestedOptions: [
+      'Engagement / Messaging (Click-to-WhatsApp)',
+      'Store Traffic in Europe',
+      'App Installs with no mobile app',
+      'Offline Event Upload only'
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Messaging objectives optimise delivery toward users most likely to open a WhatsApp or DM conversation.'
+  },
+  {
+    suggestedId: 'biz-gap-05',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_5',
+    targetLessonId: 'lesson_gyb_5_1',
+    topicGap: 'WhatsApp Enquiry Qualification & Objection Handling',
+    difficulty: 'beginner',
+    suggestedQuestionText:
+      'When an online prospect asks "How much?", which reply formula most effectively prevents the conversation from stalling?',
+    suggestedOptions: [
+      'Answer with price + Ask a qualifying question (size/area) + State the clear next step',
+      'Reply only with "Inbox me" even though you are already in chat',
+      'Send the price figure alone with zero follow-up question',
+      'Wait 72 hours before answering'
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Answer + Clarify + Next Step builds confidence and guides prospects cleanly toward placing an order.'
+  },
+  {
+    suggestedId: 'biz-gap-06',
+    categoryId: 'digital_business_entrepreneurship',
+    targetCourseId: 'grow-your-business-online',
+    targetModuleId: 'mod_gyb_6',
+    targetLessonId: 'lesson_gyb_6_1',
+    topicGap: 'Weekly Business & Marketing Performance Tracking',
+    difficulty: 'intermediate',
+    suggestedQuestionText:
+      'If your social media posts generated 40 enquiries and 10 paid orders this week, which metric equals 25%?',
+    suggestedOptions: [
+      'Enquiry-to-Order Conversion Rate',
+      'Average Shipping Weight',
+      'Gross Revenue Margin',
+      'Bounce Rate'
+    ],
+    correctAnswer: 0,
+    explanation:
+      '10 orders divided by 40 enquiries equals a 25% enquiry conversion rate—a key diagnostic metric for sales efficiency.'
+  }
+];
+

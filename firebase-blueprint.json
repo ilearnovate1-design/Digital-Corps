@@ -331,6 +331,19 @@
           "minLength": 4,
           "maxLength": 64
         },
+        "participantName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "platoon": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "stateCode": {
+          "type": "string",
+          "maxLength": 25
+        },
         "enrolledAt": {
           "type": "string",
           "format": "date-time"
@@ -354,19 +367,43 @@
         "moduleCheckScores": {
           "type": "object"
         },
+        "moduleCheckDetails": {
+          "type": "object"
+        },
         "finalAssessmentScore": {
           "type": "integer",
           "minimum": 0,
           "maximum": 100
         },
+        "finalAssessmentBestScore": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "finalAssessmentAttempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
         "finalAssessmentPassed": {
           "type": "boolean"
         },
+        "finalAssessmentVerificationToken": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "finalAssessmentCompletedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "capstoneSubmissionId": {
           "type": "string",
-          "maxLength": 64
+          "maxLength": 128
         },
         "capstoneCompleted": {
+          "type": "boolean"
+        },
+        "certificateEligible": {
           "type": "boolean"
         },
         "courseStatus": {
@@ -377,6 +414,10 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 100
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       },
       "required": [
@@ -391,13 +432,17 @@
     },
     "CourseProjectSubmission": {
       "title": "CourseProjectSubmission",
-      "description": "Capstone project submission for an Academy course.",
+      "description": "Capstone project draft or submission for an Academy course.",
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
         "submissionId": {
           "type": "string",
           "minLength": 6,
-          "maxLength": 64
+          "maxLength": 128
         },
         "participantId": {
           "type": "string",
@@ -408,6 +453,14 @@
           "type": "string",
           "minLength": 2,
           "maxLength": 100
+        },
+        "participantCallUpNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "participantPlatoon": {
+          "type": "string",
+          "maxLength": 40
         },
         "stateCode": {
           "type": "string",
@@ -435,8 +488,35 @@
         },
         "projectDescription": {
           "type": "string",
-          "minLength": 10,
-          "maxLength": 2000
+          "minLength": 0,
+          "maxLength": 5000
+        },
+        "businessName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "targetCustomerSummary": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "valueProposition": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "deliverablesChecklist": {
+          "type": "object"
+        },
+        "supportingLinks": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "uploadedAttachments": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "artifactUrl": {
+          "type": "string",
+          "maxLength": 500
         },
         "submissionUrl": {
           "type": "string",
@@ -444,15 +524,39 @@
         },
         "submissionStatus": {
           "type": "string",
-          "enum": ["submitted", "under_review", "approved", "revision_requested"]
+          "enum": ["draft", "submitted", "under_review", "approved", "revision_requested", "rejected"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "submitted", "under_review", "approved", "revision_requested", "rejected"]
+        },
+        "draftSavedAt": {
+          "type": "string",
+          "format": "date-time"
         },
         "reviewerFeedback": {
           "type": "string",
-          "maxLength": 1000
+          "maxLength": 2000
+        },
+        "coordinatorFeedback": {
+          "type": "string",
+          "maxLength": 2000
         },
         "reviewedBy": {
           "type": "string",
           "maxLength": 100
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "rubricScores": {
+          "type": "object"
         },
         "submittedAt": {
           "type": "string",
@@ -474,6 +578,30 @@
         "submissionStatus",
         "submittedAt"
       ]
+    },
+    "AcademyCourseConfig": {
+      "title": "AcademyCourseConfig",
+      "description": "Global Academy configuration overrides managed by administrators (publish toggles, pass marks, capstone rubrics).",
+      "type": "object",
+      "properties": {
+        "publishedOverrides": {
+          "type": "object"
+        },
+        "passMarkOverrides": {
+          "type": "object"
+        },
+        "capstoneRubricOverrides": {
+          "type": "object"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 100
+        }
+      }
     },
     "CDSGroup": {
       "title": "CDSGroup",
@@ -560,6 +688,12 @@
         "$ref": "#/entities/CourseProjectSubmission"
       },
       "description": "Store capstone project submissions for Academy courses."
+    },
+    "/academyCourseConfig/{configId}": {
+      "schema": {
+        "$ref": "#/entities/AcademyCourseConfig"
+      },
+      "description": "Store admin-managed Learning Academy course visibility, pass marks, and capstone rubrics."
     },
     "/cdsGroups/{groupId}": {
       "schema": {

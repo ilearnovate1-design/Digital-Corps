@@ -12,12 +12,14 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../lib/errorHandling';
-import { 
-  QuizResultRecord, 
-  PlatoonReportSummary, 
+import {
+  QuizResultRecord,
+  PlatoonReportSummary,
   PlatoonRankingItem,
   CDSGroup,
   CDSGroupRankingItem,
+  CDSMemberRankingItem,
+  CDSPerformanceDashboardData,
   ParticipantRegistration
 } from '../types';
 import { CURRENT_CAMPAIGN_ID } from './participantService';
@@ -80,7 +82,9 @@ export async function submitOfficialQuizResult(
     if (params.categoryName) payload.categoryName = params.categoryName;
   }
   if (params.attemptId) payload.attemptId = params.attemptId;
-  if (typeof params.timeTakenSeconds === 'number') payload.timeTakenSeconds = params.timeTakenSeconds;
+  if (typeof params.timeTakenSeconds === 'number' && !Number.isNaN(params.timeTakenSeconds)) {
+    payload.timeTakenSeconds = Math.max(0, Math.min(600, Math.round(params.timeTakenSeconds)));
+  }
 
   try {
     // 1 single blind write, 0 reads on client side with a 4-second strict timeout
@@ -382,6 +386,262 @@ export async function verifyQuizResult(resultId: string): Promise<void> {
 }
 
 /**
+ * Formats quiz completion duration in seconds into a readable string (e.g., "1m 42s" or "45s").
+ */
+export function formatCompletionTime(seconds?: number | null): string {
+  if (typeof seconds !== 'number' || Number.isNaN(seconds) || seconds < 0) {
+    return '—';
+  }
+  const rounded = Math.round(seconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+}
+
+/**
+ * Compares two quiz results for CDS member ranking:
+ * 1. Highest score first (descending)
+ * 2. Fastest completion time first (ascending; recorded times beat unrecorded)
+ */
+function compareQuizResultsForRank(a: QuizResultRecord, b: QuizResultRecord): number {
+  if (b.score !== a.score) {
+    return b.score - a.score;
+  }
+  const timeA = typeof a.timeTakenSeconds === 'number' ? a.timeTakenSeconds : Number.MAX_SAFE_INTEGER;
+  const timeB = typeof b.timeTakenSeconds === 'number' ? b.timeTakenSeconds : Number.MAX_SAFE_INTEGER;
+  if (timeA !== timeB) {
+    return timeA - timeB;
+  }
+  return (a.submittedAt || '').localeCompare(b.submittedAt || '');
+}
+
+/**
+ * Computes ranked CDS members in memory from loaded CDS participants and quiz results.
+ * Zero additional Firestore reads when changing CDS group or category filters.
+ */
+export function computeCDSMemberRankings(
+  cdsParticipants: ParticipantRegistration[],
+  cdsQuizResults: QuizResultRecord[],
+  cdsGroups: CDSGroup[],
+  options?: {
+    cdsGroupIdFilter?: string;
+    categoryIdFilter?: string;
+    qualifiedOnly?: boolean;
+  }
+): CDSMemberRankingItem[] {
+  const groupFilter = options?.cdsGroupIdFilter || 'all';
+  const catFilter = options?.categoryIdFilter || 'all';
+  const qualifiedOnly = Boolean(options?.qualifiedOnly);
+
+  const participantMap = new Map<string, ParticipantRegistration>();
+  cdsParticipants.forEach((p) => {
+    if (p.registrationId && p.cdsGroupId) {
+      participantMap.set(p.registrationId, p);
+    }
+  });
+
+  const groupNameMap = new Map<string, string>();
+  cdsGroups.forEach((g) => {
+    groupNameMap.set(g.id, g.name);
+  });
+
+  // Group valid quiz results by participantId (respecting group & category filters)
+  const resultsByParticipant = new Map<string, QuizResultRecord[]>();
+
+  cdsQuizResults.forEach((res) => {
+    if (res.status === 'invalidated') return;
+    const participant = participantMap.get(res.participantId);
+    if (!participant || !participant.cdsGroupId) return;
+
+    if (groupFilter !== 'all' && participant.cdsGroupId !== groupFilter) return;
+    if (catFilter !== 'all' && (res.categoryId || '') !== catFilter) return;
+
+    const existing = resultsByParticipant.get(res.participantId) || [];
+    existing.push(res);
+    resultsByParticipant.set(res.participantId, existing);
+  });
+
+  // Pick each member's best attempt (highest score, then fastest completion time)
+  const unsortedMembers: Omit<CDSMemberRankingItem, 'rank' | 'isTie' | 'displayRank'>[] = [];
+
+  resultsByParticipant.forEach((attempts, participantId) => {
+    const participant = participantMap.get(participantId)!;
+    const sortedAttempts = [...attempts].sort(compareQuizResultsForRank);
+    const best = sortedAttempts[0];
+
+    if (qualifiedOnly && !(best.score >= 6 && best.qualifying)) {
+      return;
+    }
+
+    const timeSec =
+      typeof best.timeTakenSeconds === 'number' && !Number.isNaN(best.timeTakenSeconds)
+        ? Math.round(best.timeTakenSeconds)
+        : null;
+
+    const groupName =
+      participant.cdsGroupName ||
+      groupNameMap.get(participant.cdsGroupId || '') ||
+      participant.cdsGroupId ||
+      'CDS Group';
+
+    unsortedMembers.push({
+      participantId,
+      memberName: `${participant.firstName || ''} ${participant.surname || ''}`.trim() || participantId,
+      stateCode: participant.stateCode || '—',
+      cdsGroupId: participant.cdsGroupId || '',
+      cdsGroupName: groupName,
+      categoryId: best.categoryId || 'general',
+      categoryName: best.categoryName || best.categoryId || 'General Digital',
+      score: best.score,
+      totalQuestions: best.totalQuestions || 10,
+      qualifying: Boolean(best.qualifying && best.score >= 6),
+      timeTakenSeconds: timeSec,
+      timeTakenDisplay: formatCompletionTime(timeSec),
+      attemptsCount: attempts.length,
+      submittedAt: best.submittedAt,
+      status: best.status
+    });
+  });
+
+  // Sort all members: highest score DESC, then fastest completion time ASC
+  unsortedMembers.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const tA = a.timeTakenSeconds !== null ? a.timeTakenSeconds : Number.MAX_SAFE_INTEGER;
+    const tB = b.timeTakenSeconds !== null ? b.timeTakenSeconds : Number.MAX_SAFE_INTEGER;
+    if (tA !== tB) return tA - tB;
+    return (a.submittedAt || '').localeCompare(b.submittedAt || '');
+  });
+
+  // Assign standard competition ranks (1224) with tie detection when score AND time match
+  const isExactTie = (
+    x: Omit<CDSMemberRankingItem, 'rank' | 'isTie' | 'displayRank'>,
+    y: Omit<CDSMemberRankingItem, 'rank' | 'isTie' | 'displayRank'>
+  ) => x.score === y.score && x.timeTakenSeconds === y.timeTakenSeconds;
+
+  const ranked: CDSMemberRankingItem[] = [];
+  for (let i = 0; i < unsortedMembers.length; i++) {
+    const current = unsortedMembers[i];
+    const tiedWithOthers = unsortedMembers.some(
+      (other, otherIdx) => otherIdx !== i && isExactTie(current, other)
+    );
+
+    let rank = 1;
+    if (i > 0 && isExactTie(current, unsortedMembers[i - 1])) {
+      rank = ranked[i - 1].rank;
+    } else {
+      rank = i + 1;
+    }
+
+    ranked.push({
+      ...current,
+      rank,
+      isTie: tiedWithOthers,
+      displayRank: tiedWithOthers ? `${rank} (Tie)` : `${rank}`
+    });
+  }
+
+  return ranked;
+}
+
+/**
+ * Loads combined CDS group leaderboard AND CDS member performance data in 3 bounded queries.
+ */
+export async function loadCDSPerformanceDashboardData(
+  campaignId: string = CURRENT_CAMPAIGN_ID,
+  quizRoundId: string = CURRENT_QUIZ_ROUND_ID
+): Promise<CDSPerformanceDashboardData> {
+  try {
+    const cdsCol = collection(db, 'cdsGroups');
+    const partCol = collection(db, 'participants');
+    const resCol = collection(db, 'quizResults');
+
+    const [cdsSnap, partSnap, resSnap] = await Promise.all([
+      getDocs(cdsCol),
+      getDocs(query(partCol, where('campaignId', '==', campaignId), limit(2500))),
+      getDocs(
+        query(
+          resCol,
+          where('campaignId', '==', campaignId),
+          where('quizRoundId', '==', quizRoundId),
+          limit(2500)
+        )
+      )
+    ]);
+
+    const cdsGroups = cdsSnap.docs.map((d) => ({ ...d.data(), id: d.id } as CDSGroup));
+    const allParticipants = partSnap.docs.map((d) => d.data() as ParticipantRegistration);
+    const allResults = resSnap.docs.map((d) => ({ ...d.data(), id: d.id } as QuizResultRecord));
+
+    const cdsParticipants = allParticipants.filter((p) => Boolean(p.cdsGroupId && p.cdsGroupId.trim()));
+    const cdsParticipantIds = new Set(cdsParticipants.map((p) => p.registrationId));
+    const cdsQuizResults = allResults.filter((r) => cdsParticipantIds.has(r.participantId));
+
+    const groupRankings: CDSGroupRankingItem[] = cdsGroups
+      .filter((g) => g.active || cdsParticipants.some((p) => p.cdsGroupId === g.id))
+      .map((group) => {
+        const groupParts = cdsParticipants.filter((p) => p.cdsGroupId === group.id);
+        const groupPartIds = new Set(groupParts.map((p) => p.registrationId));
+        const groupResults = cdsQuizResults.filter(
+          (r) => groupPartIds.has(r.participantId) && r.status !== 'invalidated'
+        );
+
+        const distinctQualifying = new Set(
+          groupResults
+            .filter((r) => r.score >= 6 && r.qualifying)
+            .map((r) => r.participantId)
+        );
+        const distinctQuizParticipants = new Set(groupResults.map((r) => r.participantId));
+        const totalScore = groupResults.reduce((acc, r) => acc + r.score, 0);
+
+        return {
+          cdsGroupId: group.id,
+          cdsGroupName: group.name,
+          registeredCount: groupParts.length,
+          quizParticipants: distinctQuizParticipants.size,
+          qualifyingParticipants: distinctQualifying.size,
+          qualificationRate:
+            groupParts.length > 0
+              ? Math.round((distinctQualifying.size / groupParts.length) * 100)
+              : 0,
+          averageScore:
+            groupResults.length > 0
+              ? Math.round((totalScore / groupResults.length) * 10) / 10
+              : 0,
+          academyLearnersCount: 0,
+          completedAcademyCoursesCount: 0
+        };
+      })
+      .sort((a, b) => b.qualifyingParticipants - a.qualifyingParticipants);
+
+    return {
+      campaignId,
+      quizRoundId,
+      loadedAt: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }),
+      groupRankings,
+      totalCDSMembers: cdsParticipants.length,
+      cdsParticipants,
+      cdsQuizResults
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'cds_performance');
+    return {
+      campaignId,
+      quizRoundId,
+      loadedAt: new Date().toLocaleTimeString(),
+      groupRankings: [],
+      totalCDSMembers: 0,
+      cdsParticipants: [],
+      cdsQuizResults: []
+    };
+  }
+}
+
+/**
  * Generates an aggregated report of performance by CDS group.
  * Costs: 1 read per participant + 1 read per quiz result.
  */
@@ -389,56 +649,63 @@ export async function loadCDSPerformanceReport(
   campaignId: string = CURRENT_CAMPAIGN_ID,
   quizRoundId: string = CURRENT_QUIZ_ROUND_ID
 ): Promise<CDSGroupRankingItem[]> {
+  const data = await loadCDSPerformanceDashboardData(campaignId, quizRoundId);
+  return data.groupRankings;
+}
+
+/**
+ * Exports ranked CDS member quiz results to CSV and creates an admin audit log.
+ */
+export async function exportCDSMemberRankingsCSV(
+  rankings: CDSMemberRankingItem[],
+  adminEmail: string,
+  filterSummary: string
+): Promise<string> {
+  const headers = [
+    'Rank',
+    'Member Name',
+    'NYSC State Code',
+    'CDS Group',
+    'Quiz Category',
+    'Score (Out of 10)',
+    'Qualifying (>=6)',
+    'Completion Time (Seconds)',
+    'Completion Time',
+    'Attempts Count',
+    'Status',
+    'Submitted At'
+  ];
+
+  const rows = rankings.map((m) =>
+    [
+      `"${m.displayRank}"`,
+      `"${(m.memberName || '').replace(/"/g, '""')}"`,
+      `"${(m.stateCode || '').replace(/"/g, '""')}"`,
+      `"${(m.cdsGroupName || '').replace(/"/g, '""')}"`,
+      `"${(m.categoryName || '').replace(/"/g, '""')}"`,
+      m.score,
+      m.qualifying ? 'YES' : 'NO',
+      m.timeTakenSeconds !== null ? m.timeTakenSeconds : '',
+      `"${m.timeTakenDisplay}"`,
+      m.attemptsCount,
+      `"${m.status}"`,
+      `"${m.submittedAt || ''}"`
+    ].join(',')
+  );
+
+  const csvContent = [headers.join(','), ...rows].join('\n');
+
   try {
-    const cdsCol = collection(db, 'cdsGroups');
-    const partCol = collection(db, 'participants');
-    const resCol = collection(db, 'quizResults');
-
-    // 1. Fetch data
-    const [cdsSnap, partSnap, resSnap] = await Promise.all([
-      getDocs(query(cdsCol, where('active', '==', true))),
-      getDocs(query(partCol, where('campaignId', '==', campaignId))),
-      getDocs(query(resCol, where('quizRoundId', '==', quizRoundId)))
-    ]);
-
-    const cdsGroups = cdsSnap.docs.map(d => ({ ...d.data(), id: d.id } as CDSGroup));
-    const participants = partSnap.docs.map(d => d.data() as ParticipantRegistration);
-    const results = resSnap.docs.map(d => d.data() as QuizResultRecord);
-
-    // 2. Aggregate
-    const report: CDSGroupRankingItem[] = cdsGroups.map(group => {
-      const groupParts = participants.filter(p => p.cdsGroupId === group.id);
-      const groupResults = results.filter(r => {
-        const p = participants.find(part => part.registrationId === r.participantId);
-        return p?.cdsGroupId === group.id && r.status !== 'invalidated';
-      });
-
-      const distinctQualifying = new Set(
-        groupResults
-          .filter(r => r.score >= 6 && r.qualifying)
-          .map(r => r.participantId)
-      );
-
-      const distinctQuizParticipants = new Set(groupResults.map(r => r.participantId));
-      const totalScore = groupResults.reduce((acc, r) => acc + r.score, 0);
-
-      return {
-        cdsGroupId: group.id,
-        cdsGroupName: group.name,
-        registeredCount: groupParts.length,
-        quizParticipants: distinctQuizParticipants.size,
-        qualifyingParticipants: distinctQualifying.size,
-        qualificationRate: groupParts.length > 0 ? Math.round((distinctQualifying.size / groupParts.length) * 100) : 0,
-        averageScore: distinctQuizParticipants.size > 0 ? Math.round((totalScore / groupResults.length) * 10) / 10 : 0,
-        academyLearnersCount: 0,
-        completedAcademyCoursesCount: 0
-      };
+    await addDoc(collection(db, 'adminAuditLogs'), {
+      adminEmail,
+      action: 'CSV_EXPORT',
+      details: `Exported ${rankings.length} CDS member performance rankings (${filterSummary}).`,
+      timestamp: new Date().toISOString()
     });
-
-    return report.sort((a, b) => b.qualifyingParticipants - a.qualifyingParticipants);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, 'cds_performance');
-    return [];
+  } catch (err) {
+    console.warn('Could not write audit log for CDS member CSV export:', err);
   }
+
+  return csvContent;
 }
 

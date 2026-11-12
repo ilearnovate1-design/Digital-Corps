@@ -5,11 +5,13 @@ import { COURSE_DIGITAL_ENTREPRENEURSHIP } from './courseDigitalEntrepreneurship
 import { COURSE_DIGITAL_FOUNDATIONS } from './courseDigitalFoundations';
 import { COURSE_DIGITAL_PRODUCTIVITY } from './courseDigitalProductivity';
 import { COURSE_SPREADSHEET_MASTERY } from './courseSpreadsheetMastery';
+import { COURSE_GROW_YOUR_BUSINESS_ONLINE } from './courseGrowYourBusinessOnline';
 
 export const ACADEMY_COURSES: AcademyCourse[] = [
   COURSE_AI_LITERACY,
   COURSE_CAREER_READINESS,
   COURSE_DIGITAL_ENTREPRENEURSHIP,
+  COURSE_GROW_YOUR_BUSINESS_ONLINE,
   COURSE_DIGITAL_FOUNDATIONS,
   COURSE_DIGITAL_PRODUCTIVITY,
   COURSE_SPREADSHEET_MASTERY
@@ -23,6 +25,10 @@ export function getCourseById(courseId: string): AcademyCourse | undefined {
 
 export function getCourseByCategoryId(categoryId: string): AcademyCourse | undefined {
   return ACADEMY_COURSES.find((c) => c.categoryId === categoryId);
+}
+
+export function getCoursesByCategoryId(categoryId: string): AcademyCourse[] {
+  return ACADEMY_COURSES.filter((c) => c.categoryId === categoryId);
 }
 
 export function getAllCourses(): AcademyCourse[] {

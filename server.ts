@@ -159,6 +159,34 @@ async function startServer() {
   // LEARNING ACADEMY (LMS) API ENDPOINTS
   // =========================================================================
 
+  interface AcademyAssessmentSession {
+    assessmentToken: string;
+    courseId: string;
+    participantId: string;
+    questionIds: string[];
+    optionPermutations: Record<string, number[]>; // questionId -> [origIndexAtPos0, origIndexAtPos1, ...]
+    passThreshold: number;
+    createdAt: number;
+  }
+
+  const academyAssessmentSessions = new Map<string, AcademyAssessmentSession>();
+  const academyRuntimeConfig: {
+    publishedOverrides: Record<string, boolean>;
+    passMarkOverrides: Record<string, number>;
+  } = {
+    publishedOverrides: {},
+    passMarkOverrides: {}
+  };
+
+  function shuffleArray<T>(arr: T[]): T[] {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
   // 6. GET Academy Courses Summary
   app.get('/api/academy/courses', (_req, res) => {
     try {
@@ -166,16 +194,53 @@ async function startServer() {
         courseId: c.courseId,
         categoryId: c.categoryId,
         title: c.title,
+        subtitle: c.subtitle,
         description: c.description,
+        difficulty: c.difficulty,
         targetAudience: c.targetAudience,
         expectedDuration: c.expectedDuration,
         moduleCount: c.modules.length,
         lessonCount: c.modules.reduce((acc: number, m: any) => acc + m.lessons.length, 0),
+        passThreshold:
+          academyRuntimeConfig.passMarkOverrides[c.courseId] ??
+          c.completionCriteria?.requiredFinalAssessmentPassScore ??
+          70,
         themeColor: c.themeColor,
         iconName: c.iconName,
-        active: c.active
+        active:
+          academyRuntimeConfig.publishedOverrides[c.courseId] !== undefined
+            ? academyRuntimeConfig.publishedOverrides[c.courseId]
+            : c.active
       }));
       res.json({ success: true, courses: summaries });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e?.message });
+    }
+  });
+
+  // 6b. GET / POST Academy Global Config Overrides (Pass Marks & Publish Status)
+  app.get('/api/academy/config', (_req, res) => {
+    res.json({ success: true, config: academyRuntimeConfig });
+  });
+
+  app.post('/api/academy/config', (req, res) => {
+    try {
+      const { publishedOverrides, passMarkOverrides } = req.body || {};
+      if (publishedOverrides && typeof publishedOverrides === 'object') {
+        academyRuntimeConfig.publishedOverrides = {
+          ...academyRuntimeConfig.publishedOverrides,
+          ...publishedOverrides
+        };
+      }
+      if (passMarkOverrides && typeof passMarkOverrides === 'object') {
+        for (const [k, v] of Object.entries(passMarkOverrides)) {
+          const num = Number(v);
+          if (!Number.isNaN(num) && num >= 40 && num <= 100) {
+            academyRuntimeConfig.passMarkOverrides[k] = Math.round(num);
+          }
+        }
+      }
+      res.json({ success: true, config: academyRuntimeConfig });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e?.message });
     }
@@ -191,44 +256,160 @@ async function startServer() {
     }
   });
 
-  // 8. POST Evaluate Course Final Assessment (Server-authoritative scoring)
-  app.post('/api/academy/evaluate-assessment', (req, res) => {
+  // 7b. POST Start Randomized Course Final Assessment (NO answers/explanations exposed)
+  app.post('/api/academy/start-assessment', (req, res) => {
     try {
-      const { courseId, answers = {} } = req.body;
+      const { courseId, participantId = 'guest_learner' } = req.body || {};
       const course = getCourseById(courseId);
       if (!course) {
         return res.status(404).json({ success: false, error: 'Course not found' });
       }
 
-      let score = 0;
-      const total = course.finalAssessment.length;
-      const review = course.finalAssessment.map((q: any) => {
-        const userAnswer = answers[q.id];
-        const isCorrect = userAnswer !== undefined && userAnswer === q.correctAnswer;
-        if (isCorrect) score++;
+      const isPublished =
+        academyRuntimeConfig.publishedOverrides[courseId] !== undefined
+          ? academyRuntimeConfig.publishedOverrides[courseId]
+          : course.active;
+      if (!isPublished) {
+        return res.status(403).json({ success: false, error: 'This course is currently unpublished.' });
+      }
+
+      const passThreshold =
+        academyRuntimeConfig.passMarkOverrides[courseId] ??
+        course.completionCriteria.requiredFinalAssessmentPassScore ??
+        70;
+
+      const shuffledQuestions = shuffleArray(course.finalAssessment);
+      const optionPermutations: Record<string, number[]> = {};
+      const clientQuestions = shuffledQuestions.map((q) => {
+        const idxPerm = shuffleArray(q.options.map((_, idx) => idx));
+        optionPermutations[q.id] = idxPerm;
         return {
           id: q.id,
           questionText: q.questionText,
-          options: q.options,
-          userAnswer: userAnswer !== undefined ? userAnswer : null,
-          correctAnswer: q.correctAnswer,
+          options: idxPerm.map((origIdx) => q.options[origIdx]),
+          moduleId: q.moduleId
+        };
+      });
+
+      const assessmentToken = `asm_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      academyAssessmentSessions.set(assessmentToken, {
+        assessmentToken,
+        courseId,
+        participantId,
+        questionIds: shuffledQuestions.map((q) => q.id),
+        optionPermutations,
+        passThreshold,
+        createdAt: Date.now()
+      });
+
+      // Prune expired sessions (> 4 hours)
+      const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000;
+      for (const [token, s] of academyAssessmentSessions.entries()) {
+        if (s.createdAt < fourHoursAgo) {
+          academyAssessmentSessions.delete(token);
+        }
+      }
+
+      return res.json({
+        success: true,
+        assessmentToken,
+        courseId: course.courseId,
+        courseTitle: course.title,
+        totalQuestions: clientQuestions.length,
+        passThreshold,
+        questions: clientQuestions
+      });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e?.message || 'Failed to start assessment' });
+    }
+  });
+
+  // 8. POST Evaluate Course Final Assessment (Server-authoritative scoring & review)
+  app.post('/api/academy/evaluate-assessment', (req, res) => {
+    try {
+      const { courseId, assessmentToken, answers = {} } = req.body || {};
+      const course = getCourseById(courseId);
+      if (!course) {
+        return res.status(404).json({ success: false, error: 'Course not found' });
+      }
+
+      const session = assessmentToken ? academyAssessmentSessions.get(assessmentToken) : undefined;
+      const effectivePassThreshold =
+        session?.passThreshold ??
+        academyRuntimeConfig.passMarkOverrides[courseId] ??
+        course.completionCriteria.requiredFinalAssessmentPassScore ??
+        70;
+
+      const orderedQuestions =
+        session && session.courseId === courseId
+          ? session.questionIds
+              .map((qId) => course.finalAssessment.find((q) => q.id === qId))
+              .filter((q): q is NonNullable<typeof q> => Boolean(q))
+          : course.finalAssessment;
+
+      let score = 0;
+      const total = orderedQuestions.length;
+      const moduleStats: Record<string, { score: number; total: number }> = {};
+
+      const results = orderedQuestions.map((q) => {
+        const perm = session?.optionPermutations[q.id];
+        const presentedOptions = perm ? perm.map((origIdx) => q.options[origIdx]) : q.options;
+        const presentedCorrectAnswer = perm ? perm.indexOf(q.correctAnswer) : q.correctAnswer;
+
+        const rawUserAnswer = answers[q.id];
+        const hasAnswer = rawUserAnswer !== undefined && rawUserAnswer !== null;
+        const isCorrect = hasAnswer && Number(rawUserAnswer) === presentedCorrectAnswer;
+        if (isCorrect) score++;
+
+        if (q.moduleId) {
+          if (!moduleStats[q.moduleId]) {
+            moduleStats[q.moduleId] = { score: 0, total: 0 };
+          }
+          moduleStats[q.moduleId].total++;
+          if (isCorrect) moduleStats[q.moduleId].score++;
+        }
+
+        return {
+          id: q.id,
+          moduleId: q.moduleId,
+          questionText: q.questionText,
+          options: presentedOptions,
+          userAnswer: hasAnswer ? Number(rawUserAnswer) : null,
+          correctAnswer: presentedCorrectAnswer,
           isCorrect,
           explanation: q.explanation
         };
       });
 
-      const percentage = Math.round((score / total) * 100);
-      const passed = percentage >= course.completionCriteria.requiredFinalAssessmentPassScore;
+      const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+      const passed = percentage >= effectivePassThreshold;
+      const evaluatedAt = new Date().toISOString();
+      const verificationToken = `vrf_${courseId}_${Date.now().toString(36)}_${score}of${total}`;
+
+      const evaluation = {
+        courseId,
+        assessmentToken: assessmentToken || null,
+        verificationToken,
+        score,
+        total,
+        percentage,
+        passThreshold: effectivePassThreshold,
+        passed,
+        evaluatedAt,
+        moduleBreakdown: moduleStats,
+        results
+      };
 
       res.json({
         success: true,
+        evaluation,
         courseId,
         score,
         total,
         percentage,
-        passThreshold: course.completionCriteria.requiredFinalAssessmentPassScore,
+        passThreshold: effectivePassThreshold,
         passed,
-        review
+        review: results
       });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e?.message });

@@ -218,14 +218,14 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               <GraduationCap className="w-5 h-5" />
             </div>
             <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-              6 Courses
+              7 Courses
             </span>
           </div>
           <h3 className="font-bold text-stone-900 text-base mb-1 group-hover:text-emerald-700 transition-colors">
             3. Learning Academy
           </h3>
           <p className="text-xs text-stone-600 leading-relaxed">
-            Master 6 full practical courses with bite-sized lessons, quizzes, Nigerian case studies, and capstone certifications.
+            Master 7 full practical courses with bite-sized lessons, quizzes, Nigerian case studies, and capstone certifications.
           </p>
         </div>
 

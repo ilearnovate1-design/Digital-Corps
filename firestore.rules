@@ -251,7 +251,7 @@ service cloud.firestore {
 
     // 8. Collection: /learningProgress/{progressId}
     // Format: ${courseId}_${participantId}
-    // Participant can manage their own progress; Admins can read for analytics.
+    // Participant can manage their own progress via deterministic ID; Admins can list for analytics.
     function isValidLearningProgress(progressId, data) {
       return data.keys().hasAll([
         'participantId',
@@ -261,23 +261,72 @@ service cloud.firestore {
         'completedLessonIds',
         'courseStatus',
         'progressPercentage'
+      ]) && data.keys().hasOnly([
+        'participantId',
+        'courseId',
+        'participantName',
+        'platoon',
+        'stateCode',
+        'enrolledAt',
+        'lastAccessedAt',
+        'lastAccessedLessonId',
+        'completedLessonIds',
+        'completedModuleIds',
+        'moduleCheckScores',
+        'moduleCheckDetails',
+        'finalAssessmentScore',
+        'finalAssessmentBestScore',
+        'finalAssessmentAttempts',
+        'finalAssessmentPassed',
+        'finalAssessmentVerificationToken',
+        'finalAssessmentCompletedAt',
+        'capstoneSubmissionId',
+        'capstoneCompleted',
+        'certificateEligible',
+        'courseStatus',
+        'progressPercentage',
+        'completedAt'
       ]) &&
       progressId == data.courseId + '_' + data.participantId &&
       data.participantId is string && data.participantId.size() >= 4 && data.participantId.size() <= 64 &&
       data.courseId is string && data.courseId.size() >= 4 && data.courseId.size() <= 64 &&
+      (!('participantName' in data) || (data.participantName is string && data.participantName.size() <= 100)) &&
+      (!('platoon' in data) || (data.platoon is int && data.platoon >= 0 && data.platoon <= 10)) &&
+      (!('stateCode' in data) || (data.stateCode is string && data.stateCode.size() <= 25)) &&
+      data.enrolledAt is string && data.enrolledAt.size() <= 40 &&
+      data.lastAccessedAt is string && data.lastAccessedAt.size() <= 40 &&
+      (!('lastAccessedLessonId' in data) || (data.lastAccessedLessonId is string && data.lastAccessedLessonId.size() <= 64)) &&
       data.completedLessonIds is list && data.completedLessonIds.size() <= 50 &&
+      (!('completedModuleIds' in data) || (data.completedModuleIds is list && data.completedModuleIds.size() <= 20)) &&
+      (!('moduleCheckScores' in data) || data.moduleCheckScores is map) &&
+      (!('moduleCheckDetails' in data) || data.moduleCheckDetails is map) &&
+      (!('finalAssessmentScore' in data) || (data.finalAssessmentScore is int && data.finalAssessmentScore >= 0 && data.finalAssessmentScore <= 100)) &&
+      (!('finalAssessmentBestScore' in data) || (data.finalAssessmentBestScore is int && data.finalAssessmentBestScore >= 0 && data.finalAssessmentBestScore <= 100)) &&
+      (!('finalAssessmentAttempts' in data) || (data.finalAssessmentAttempts is int && data.finalAssessmentAttempts >= 0 && data.finalAssessmentAttempts <= 1000)) &&
+      (!('finalAssessmentPassed' in data) || data.finalAssessmentPassed is bool) &&
+      (!('finalAssessmentVerificationToken' in data) || (data.finalAssessmentVerificationToken is string && data.finalAssessmentVerificationToken.size() <= 120)) &&
+      (!('finalAssessmentCompletedAt' in data) || (data.finalAssessmentCompletedAt is string && data.finalAssessmentCompletedAt.size() <= 40)) &&
+      (!('capstoneSubmissionId' in data) || (data.capstoneSubmissionId is string && data.capstoneSubmissionId.size() <= 128)) &&
+      (!('capstoneCompleted' in data) || data.capstoneCompleted is bool) &&
+      (!('certificateEligible' in data) || data.certificateEligible is bool) &&
       data.courseStatus in ['not_started', 'in_progress', 'completed'] &&
-      data.progressPercentage is int && data.progressPercentage >= 0 && data.progressPercentage <= 100;
+      data.progressPercentage is int && data.progressPercentage >= 0 && data.progressPercentage <= 100 &&
+      (!('completedAt' in data) || (data.completedAt is string && data.completedAt.size() <= 40));
     }
 
     match /learningProgress/{progressId} {
-      allow create, update: if isValidId(progressId) && isValidLearningProgress(progressId, incoming());
-      allow read: if true; // Public read allows participant client caching and admin analytics
+      allow create: if isValidId(progressId) && isValidLearningProgress(progressId, incoming());
+      allow update: if isValidId(progressId) &&
+        isValidLearningProgress(progressId, incoming()) &&
+        incoming().participantId == existing().participantId &&
+        incoming().courseId == existing().courseId;
+      allow get: if isAdmin() || isValidId(progressId);
+      allow list: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // 9. Collection: /courseProjectSubmissions/{submissionId}
-    // Participants submit capstone projects; Admins can read, review, and feedback.
+    // Participants save drafts & submit capstone projects; Admins can list, review, score, and feedback.
     function isValidProjectSubmission(data) {
       return data.keys().hasAll([
         'submissionId',
@@ -289,20 +338,129 @@ service cloud.firestore {
         'projectDescription',
         'submissionStatus',
         'submittedAt'
+      ]) && data.keys().hasOnly([
+        'id',
+        'submissionId',
+        'participantId',
+        'participantName',
+        'participantCallUpNumber',
+        'participantPlatoon',
+        'platoon',
+        'stateCode',
+        'courseId',
+        'courseTitle',
+        'projectTitle',
+        'projectDescription',
+        'businessName',
+        'targetCustomerSummary',
+        'valueProposition',
+        'deliverablesChecklist',
+        'supportingLinks',
+        'uploadedAttachments',
+        'artifactUrl',
+        'submissionUrl',
+        'submissionStatus',
+        'status',
+        'draftSavedAt',
+        'reviewerFeedback',
+        'coordinatorFeedback',
+        'reviewedBy',
+        'reviewedAt',
+        'score',
+        'rubricScores',
+        'submittedAt',
+        'updatedAt'
       ]) &&
-      data.submissionId is string && data.submissionId.size() >= 6 &&
-      data.participantId is string && data.participantId.size() >= 4 &&
-      data.participantName is string && data.participantName.size() >= 2 &&
-      data.courseId is string && data.courseId.size() >= 4 &&
+      (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+      data.submissionId is string && data.submissionId.size() >= 6 && data.submissionId.size() <= 128 &&
+      data.participantId is string && data.participantId.size() >= 4 && data.participantId.size() <= 64 &&
+      data.participantName is string && data.participantName.size() >= 2 && data.participantName.size() <= 100 &&
+      (!('participantCallUpNumber' in data) || (data.participantCallUpNumber is string && data.participantCallUpNumber.size() <= 40)) &&
+      (!('participantPlatoon' in data) || (data.participantPlatoon is string && data.participantPlatoon.size() <= 40)) &&
+      (!('platoon' in data) || (data.platoon is int && data.platoon >= 0 && data.platoon <= 10)) &&
+      (!('stateCode' in data) || (data.stateCode is string && data.stateCode.size() <= 25)) &&
+      data.courseId is string && data.courseId.size() >= 4 && data.courseId.size() <= 64 &&
+      data.courseTitle is string && data.courseTitle.size() >= 2 && data.courseTitle.size() <= 120 &&
       data.projectTitle is string && data.projectTitle.size() >= 3 && data.projectTitle.size() <= 150 &&
-      data.projectDescription is string && data.projectDescription.size() >= 10 && data.projectDescription.size() <= 2000 &&
-      data.submissionStatus in ['submitted', 'under_review', 'approved', 'revision_requested'];
+      data.projectDescription is string && data.projectDescription.size() <= 5000 &&
+      (data.submissionStatus == 'draft' || data.projectDescription.size() >= 10) &&
+      (!('businessName' in data) || (data.businessName is string && data.businessName.size() <= 150)) &&
+      (!('targetCustomerSummary' in data) || (data.targetCustomerSummary is string && data.targetCustomerSummary.size() <= 1000)) &&
+      (!('valueProposition' in data) || (data.valueProposition is string && data.valueProposition.size() <= 1000)) &&
+      (!('deliverablesChecklist' in data) || data.deliverablesChecklist is map) &&
+      (!('supportingLinks' in data) || (data.supportingLinks is list && data.supportingLinks.size() <= 15)) &&
+      (!('uploadedAttachments' in data) || (data.uploadedAttachments is list && data.uploadedAttachments.size() <= 5)) &&
+      (!('artifactUrl' in data) || (data.artifactUrl is string && data.artifactUrl.size() <= 500)) &&
+      (!('submissionUrl' in data) || (data.submissionUrl is string && data.submissionUrl.size() <= 500)) &&
+      data.submissionStatus in ['draft', 'submitted', 'under_review', 'approved', 'revision_requested', 'rejected'] &&
+      (!('status' in data) || (data.status in ['draft', 'submitted', 'under_review', 'approved', 'revision_requested', 'rejected'])) &&
+      (!('draftSavedAt' in data) || (data.draftSavedAt is string && data.draftSavedAt.size() <= 40)) &&
+      (!('reviewerFeedback' in data) || (data.reviewerFeedback is string && data.reviewerFeedback.size() <= 2000)) &&
+      (!('coordinatorFeedback' in data) || (data.coordinatorFeedback is string && data.coordinatorFeedback.size() <= 2000)) &&
+      (!('reviewedBy' in data) || (data.reviewedBy is string && data.reviewedBy.size() <= 100)) &&
+      (!('reviewedAt' in data) || (data.reviewedAt is string && data.reviewedAt.size() <= 40)) &&
+      (!('score' in data) || (data.score is int && data.score >= 0 && data.score <= 100)) &&
+      (!('rubricScores' in data) || data.rubricScores is map) &&
+      data.submittedAt is string && data.submittedAt.size() <= 40 &&
+      (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 40));
     }
 
     match /courseProjectSubmissions/{submissionId} {
-      allow create: if isValidId(submissionId) && isValidProjectSubmission(incoming());
-      allow read: if isAdmin() || (incoming() != null && resource.data.participantId == request.auth.uid);
-      allow update: if isAdmin(); // Only verified coordinators can review and score projects
+      allow create: if isValidId(submissionId) &&
+        isValidProjectSubmission(incoming()) &&
+        submissionId == 'sub_' + incoming().courseId + '_' + incoming().participantId &&
+        incoming().submissionStatus in ['draft', 'submitted'] &&
+        !('score' in incoming()) &&
+        !('rubricScores' in incoming()) &&
+        !('reviewerFeedback' in incoming()) &&
+        !('coordinatorFeedback' in incoming()) &&
+        !('reviewedBy' in incoming()) &&
+        !('reviewedAt' in incoming());
+      allow get: if isAdmin() || isValidId(submissionId);
+      allow list: if isAdmin();
+      allow update: if isValidId(submissionId) &&
+        isValidProjectSubmission(incoming()) && (
+          isAdmin() ||
+          (
+            existing().submissionStatus in ['draft', 'submitted', 'revision_requested'] &&
+            incoming().submissionStatus in ['draft', 'submitted'] &&
+            incoming().participantId == existing().participantId &&
+            incoming().courseId == existing().courseId &&
+            incoming().submissionId == existing().submissionId &&
+            !incoming().diff(existing()).affectedKeys().hasAny([
+              'score',
+              'rubricScores',
+              'reviewerFeedback',
+              'coordinatorFeedback',
+              'reviewedBy',
+              'reviewedAt'
+            ])
+          )
+        );
+      allow delete: if isAdmin();
+    }
+
+    // 10. Collection: /academyCourseConfig/{configId}
+    // Global course visibility, pass mark overrides, and capstone rubric overrides.
+    function isValidAcademyCourseConfig(data) {
+      return data.keys().hasOnly([
+        'publishedOverrides',
+        'passMarkOverrides',
+        'capstoneRubricOverrides',
+        'updatedAt',
+        'updatedBy'
+      ]) &&
+      (!('publishedOverrides' in data) || data.publishedOverrides is map) &&
+      (!('passMarkOverrides' in data) || data.passMarkOverrides is map) &&
+      (!('capstoneRubricOverrides' in data) || data.capstoneRubricOverrides is map) &&
+      (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 40)) &&
+      (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 100));
+    }
+
+    match /academyCourseConfig/{configId} {
+      allow get: if configId == 'global' || isAdmin();
+      allow list: if isAdmin();
+      allow create, update: if isAdmin() && configId == 'global' && isValidAcademyCourseConfig(incoming());
       allow delete: if isAdmin();
     }
   }

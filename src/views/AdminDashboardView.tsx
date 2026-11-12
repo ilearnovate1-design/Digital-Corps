@@ -7,13 +7,17 @@ import {
   PlatoonRankingItem,
   QuizResultRecord,
   CDSGroup,
-  CDSGroupRankingItem
+  CDSGroupRankingItem,
+  CDSMemberRankingItem,
+  CDSPerformanceDashboardData
 } from '../types';
 import {
   loadPlatoonPerformanceReport,
   invalidateQuizResult,
   verifyQuizResult,
-  loadCDSPerformanceReport,
+  loadCDSPerformanceDashboardData,
+  computeCDSMemberRankings,
+  exportCDSMemberRankingsCSV,
   CURRENT_QUIZ_ROUND_ID
 } from '../services/quizResultService';
 import { CURRENT_CAMPAIGN_ID } from '../services/participantService';
@@ -33,11 +37,31 @@ import {
 } from '../services/adminService';
 import { DirectMessageModal } from '../components/DirectMessageModal';
 import { BroadcastMessagingView } from '../components/BroadcastMessagingView';
-import { ALL_ACADEMY_COURSES } from '../data/academy';
-import { generateQuestionCoverageReport, QUESTION_OBJECTIVE_MAPPINGS } from '../data/academy/questionObjectiveMappings';
-import { loadAllCourseSubmissionsForReview, reviewCourseProjectSubmission } from '../services/academyService';
+import { ALL_ACADEMY_COURSES, getCourseById } from '../data/academy';
+import {
+  generateQuestionCoverageReport,
+  QUESTION_OBJECTIVE_MAPPINGS,
+  RECOMMENDED_ADDITIONAL_BIZ_QUESTIONS
+} from '../data/academy/questionObjectiveMappings';
+import {
+  DEFAULT_ACADEMY_GLOBAL_CONFIG,
+  getCourseCompletionSummary,
+  getEffectiveCoursePassThreshold,
+  isCourseEffectivelyPublished,
+  loadAcademyGlobalConfig,
+  loadAllCourseSubmissionsForReview,
+  loadAllLearningProgressForAdmin,
+  reviewCourseProjectSubmission,
+  saveAcademyGlobalConfig
+} from '../services/academyService';
 import { loadAllCDSGroups, saveCDSGroup } from '../services/cdsGroupService';
-import { CourseProjectSubmission } from '../types';
+import {
+  AcademyCourse,
+  AcademyGlobalConfig,
+  CapstoneRubricCriterion,
+  CourseProjectSubmission,
+  ParticipantCourseProgress
+} from '../types';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -107,22 +131,45 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
   // Active Tab: 'overview' | 'participants' | 'messaging' | 'platoon_tracker' | 'launch' | 'academy' | 'cds'
   const [activeTab, setActiveTab] = useState<'overview' | 'participants' | 'messaging' | 'platoon_tracker' | 'launch' | 'academy' | 'cds'>('overview');
 
-  // CDS Management State
+  // CDS Management & Member Performance Tracker State
   const [cdsGroups, setCdsGroups] = useState<CDSGroup[]>([]);
   const [isLoadingCDS, setIsLoadingCDS] = useState(false);
   const [isSavingCDS, setIsSavingCDS] = useState(false);
   const [isCDSModalOpen, setIsCDSModalOpen] = useState(false);
   const [editingCDS, setEditingCDS] = useState<Partial<CDSGroup> | null>(null);
   const [cdsPerformance, setCdsPerformance] = useState<CDSGroupRankingItem[]>([]);
+  const [cdsDashboardData, setCdsDashboardData] = useState<CDSPerformanceDashboardData | null>(null);
+  const [cdsMemberGroupFilter, setCdsMemberGroupFilter] = useState<string>('all');
+  const [cdsMemberCategoryFilter, setCdsMemberCategoryFilter] = useState<string>('all');
+  const [cdsMemberQualifiedOnly, setCdsMemberQualifiedOnly] = useState<boolean>(false);
+  const [isExportingCDSCSV, setIsExportingCDSCSV] = useState<boolean>(false);
 
   // Academy management state
   const [academySubmissions, setAcademySubmissions] = useState<CourseProjectSubmission[]>([]);
+  const [academyProgressList, setAcademyProgressList] = useState<ParticipantCourseProgress[]>([]);
+  const [academyConfig, setAcademyConfig] = useState<AcademyGlobalConfig>(DEFAULT_ACADEMY_GLOBAL_CONFIG);
   const [isLoadingAcademySubs, setIsLoadingAcademySubs] = useState(false);
+  const [isSavingAcademyConfig, setIsSavingAcademyConfig] = useState(false);
+  const [academyAdminNotice, setAcademyAdminNotice] = useState<string | null>(null);
   const [reviewingSub, setReviewingSub] = useState<CourseProjectSubmission | null>(null);
   const [reviewFeedback, setReviewFeedback] = useState('');
   const [reviewScore, setReviewScore] = useState<number>(85);
+  const [reviewRubricScores, setReviewRubricScores] = useState<Record<string, number>>({});
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showCoverageDetails, setShowCoverageDetails] = useState(false);
+  const [showGapRecommendations, setShowGapRecommendations] = useState(false);
+  const [inspectingCourse, setInspectingCourse] = useState<AcademyCourse | null>(null);
+  const [editingRubricCourse, setEditingRubricCourse] = useState<AcademyCourse | null>(null);
+  const [draftRubricCriteria, setDraftRubricCriteria] = useState<CapstoneRubricCriterion[]>([]);
+
+  // Academy Learner & Submission Filters
+  const [academyFilterCourse, setAcademyFilterCourse] = useState<string>('all');
+  const [academyFilterModule, setAcademyFilterModule] = useState<string>('all');
+  const [academyFilterLearner, setAcademyFilterLearner] = useState<string>('');
+  const [academyFilterPlatoon, setAcademyFilterPlatoon] = useState<string>('all');
+  const [academyFilterCompletion, setAcademyFilterCompletion] = useState<string>('all');
+  const [academyFilterAssessment, setAcademyFilterAssessment] = useState<string>('all');
+  const [academyFilterSubmission, setAcademyFilterSubmission] = useState<string>('all');
 
   // Direct Message Modal State
   const [selectedParticipantForMessage, setSelectedParticipantForMessage] = useState<ParticipantRecordItem | null>(null);
@@ -239,36 +286,130 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
     }
   };
 
-  // Academy Submissions Handlers
+  // Academy Submissions, Progress & Config Handlers
   const handleLoadAcademySubmissions = async () => {
     setIsLoadingAcademySubs(true);
+    setAcademyAdminNotice(null);
     try {
-      const subs = await loadAllCourseSubmissionsForReview();
+      const [subs, progs, cfg] = await Promise.all([
+        loadAllCourseSubmissionsForReview(),
+        loadAllLearningProgressForAdmin(250),
+        loadAcademyGlobalConfig()
+      ]);
       setAcademySubmissions(subs);
+      setAcademyProgressList(progs);
+      setAcademyConfig(cfg);
     } catch (err: any) {
-      console.error('Failed to load academy submissions:', err);
+      console.error('Failed to load academy data:', err);
+      setAcademyAdminNotice('Could not load some Academy data: ' + (err?.message || 'Permission or network error'));
     } finally {
       setIsLoadingAcademySubs(false);
     }
   };
 
-  const handleReviewSubmission = async (status: 'approved' | 'resubmission_requested') => {
+  const handleToggleCoursePublished = async (course: AcademyCourse) => {
+    setIsSavingAcademyConfig(true);
+    setAcademyAdminNotice(null);
+    try {
+      const currentlyPublished = isCourseEffectivelyPublished(course, academyConfig);
+      const nextConfig: AcademyGlobalConfig = {
+        ...academyConfig,
+        publishedOverrides: {
+          ...academyConfig.publishedOverrides,
+          [course.courseId]: !currentlyPublished
+        }
+      };
+      const saved = await saveAcademyGlobalConfig(nextConfig, currentUser?.email || 'Admin');
+      setAcademyConfig(saved);
+      setAcademyAdminNotice(`${course.title} is now ${!currentlyPublished ? 'Published' : 'Unpublished'}.`);
+    } catch (err: any) {
+      setAcademyAdminNotice('Failed to update course publish state: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsSavingAcademyConfig(false);
+    }
+  };
+
+  const handleUpdateCoursePassMark = async (courseId: string, passMark: number) => {
+    const cleanPass = Math.min(100, Math.max(40, Math.round(Number(passMark) || 70)));
+    setIsSavingAcademyConfig(true);
+    setAcademyAdminNotice(null);
+    try {
+      const nextConfig: AcademyGlobalConfig = {
+        ...academyConfig,
+        passMarkOverrides: {
+          ...academyConfig.passMarkOverrides,
+          [courseId]: cleanPass
+        }
+      };
+      const saved = await saveAcademyGlobalConfig(nextConfig, currentUser?.email || 'Admin');
+      setAcademyConfig(saved);
+      setAcademyAdminNotice(`Updated pass mark for ${courseId} to ${cleanPass}%.`);
+    } catch (err: any) {
+      setAcademyAdminNotice('Failed to save pass mark: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsSavingAcademyConfig(false);
+    }
+  };
+
+  const handleSaveCapstoneRubric = async () => {
+    if (!editingRubricCourse) return;
+    setIsSavingAcademyConfig(true);
+    setAcademyAdminNotice(null);
+    try {
+      const nextConfig: AcademyGlobalConfig = {
+        ...academyConfig,
+        capstoneRubricOverrides: {
+          ...(academyConfig.capstoneRubricOverrides || {}),
+          [editingRubricCourse.courseId]: draftRubricCriteria
+        }
+      };
+      const saved = await saveAcademyGlobalConfig(nextConfig, currentUser?.email || 'Admin');
+      setAcademyConfig(saved);
+      setEditingRubricCourse(null);
+      setAcademyAdminNotice(`Saved custom capstone rubric for ${editingRubricCourse.title}.`);
+    } catch (err: any) {
+      setAcademyAdminNotice('Failed to save capstone rubric: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsSavingAcademyConfig(false);
+    }
+  };
+
+  const openCapstoneReviewModal = (sub: CourseProjectSubmission) => {
+    setReviewingSub(sub);
+    setReviewFeedback(sub.reviewerFeedback || sub.coordinatorFeedback || '');
+    setReviewScore(sub.score ?? 85);
+    const course = getCourseById(sub.courseId);
+    const rubric =
+      academyConfig.capstoneRubricOverrides?.[sub.courseId] || course?.capstoneProject.rubric || [];
+    const initialRubricScores: Record<string, number> = {};
+    rubric.forEach((r) => {
+      initialRubricScores[r.id] = sub.rubricScores?.[r.id] ?? r.weight;
+    });
+    setReviewRubricScores(initialRubricScores);
+  };
+
+  const handleReviewSubmission = async (
+    status: 'under_review' | 'approved' | 'revision_requested' | 'rejected'
+  ) => {
     if (!reviewingSub) return;
     setIsSubmittingReview(true);
+    setAcademyAdminNotice(null);
     try {
       await reviewCourseProjectSubmission(
         reviewingSub.submissionId || reviewingSub.id || '',
         status,
         reviewFeedback,
         reviewScore,
-        currentUser?.email || 'jomaschools@gmail.com'
+        currentUser?.email || 'jomaschools@gmail.com',
+        Object.keys(reviewRubricScores).length > 0 ? reviewRubricScores : undefined
       );
       setReviewingSub(null);
       setReviewFeedback('');
-      handleLoadAcademySubmissions();
+      await handleLoadAcademySubmissions();
+      setAcademyAdminNotice(`Capstone submission marked as "${status.replace('_', ' ')}".`);
     } catch (err: any) {
       console.error('Failed to save review:', err);
-      alert('Failed to save review: ' + (err.message || 'Unknown error'));
+      setAcademyAdminNotice('Failed to save review: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSubmittingReview(false);
     }
@@ -414,15 +555,66 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
   const handleLoadCDSPerformance = async () => {
     setIsLoadingCDS(true);
     try {
-      const performance = await loadCDSPerformanceReport(
+      const dashboardData = await loadCDSPerformanceDashboardData(
         platoonFilterCampaign,
         platoonFilterRound
       );
-      setCdsPerformance(performance);
+      setCdsDashboardData(dashboardData);
+      setCdsPerformance(dashboardData.groupRankings);
     } catch (err) {
       console.error('Failed to load CDS performance:', err);
     } finally {
       setIsLoadingCDS(false);
+    }
+  };
+
+  const cdsMemberRankings: CDSMemberRankingItem[] = React.useMemo(() => {
+    if (!cdsDashboardData) return [];
+    return computeCDSMemberRankings(
+      cdsDashboardData.cdsParticipants,
+      cdsDashboardData.cdsQuizResults,
+      cdsGroups,
+      {
+        cdsGroupIdFilter: cdsMemberGroupFilter,
+        categoryIdFilter: cdsMemberCategoryFilter,
+        qualifiedOnly: cdsMemberQualifiedOnly
+      }
+    );
+  }, [
+    cdsDashboardData,
+    cdsGroups,
+    cdsMemberGroupFilter,
+    cdsMemberCategoryFilter,
+    cdsMemberQualifiedOnly
+  ]);
+
+  const handleExportCDSMemberCSV = async () => {
+    if (!currentUser?.email || cdsMemberRankings.length === 0) return;
+    setIsExportingCDSCSV(true);
+    try {
+      const groupLabel =
+        cdsMemberGroupFilter === 'all'
+          ? 'All CDS Groups'
+          : cdsGroups.find((g) => g.id === cdsMemberGroupFilter)?.name || cdsMemberGroupFilter;
+      const csv = await exportCDSMemberRankingsCSV(
+        cdsMemberRankings,
+        currentUser.email,
+        `${groupLabel} • ${cdsMemberCategoryFilter} • ${platoonFilterRound}`
+      );
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `cds_member_rankings_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setPlatoonActionFeedback(`Exported ${cdsMemberRankings.length} CDS member rankings to CSV.`);
+      setTimeout(() => setPlatoonActionFeedback(null), 4000);
+    } catch (err) {
+      console.error('Failed to export CDS member rankings CSV:', err);
+    } finally {
+      setIsExportingCDSCSV(false);
     }
   };
 
@@ -1589,10 +1781,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
 
                   {/* CDS Performance Leaderboard */}
                   <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-xs">
-                    <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/70">
-                      <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
-                        CDS Group Digital Performance Leaderboard
-                      </h4>
+                    <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/70 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
+                          CDS Group Digital Performance Leaderboard
+                        </h4>
+                        <p className="text-[10px] sm:text-[11px] text-stone-500">
+                          Group-level registration and qualification totals for {platoonFilterRound}.
+                        </p>
+                      </div>
+                      {cdsDashboardData && (
+                        <span className="text-[10px] font-mono text-stone-500">
+                          Loaded {cdsDashboardData.loadedAt}
+                        </span>
+                      )}
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
@@ -1620,6 +1822,227 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                             <tr>
                               <td colSpan={6} className="py-8 text-center text-stone-400 italic">
                                 {isLoadingCDS ? 'Calculating performance...' : 'No CDS performance data available for this round.'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* CDS MEMBER PERFORMANCE TRACKER */}
+                  <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs space-y-4 p-4 sm:p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                      <div>
+                        <h4 className="font-black text-stone-900 text-sm flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-amber-500" />
+                          <span>CDS Member Performance Tracker</span>
+                        </h4>
+                        <p className="text-[11px] text-stone-500 mt-0.5">
+                          Ranks individual CDS members by <strong>highest quiz score</strong>, breaking ties by <strong>fastest completion time</strong>.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleExportCDSMemberCSV}
+                        disabled={isExportingCDSCSV || cdsMemberRankings.length === 0}
+                        className="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-xl text-[11px] cursor-pointer disabled:opacity-50 shrink-0"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{isExportingCDSCSV ? 'Exporting...' : 'Export Rankings CSV'}</span>
+                      </button>
+                    </div>
+
+                    {/* Filters Row (Zero extra Firestore reads) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-stone-50 p-3 rounded-xl border border-stone-200">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-stone-500 mb-1">
+                          Filter by CDS Group
+                        </label>
+                        <select
+                          value={cdsMemberGroupFilter}
+                          onChange={(e) => setCdsMemberGroupFilter(e.target.value)}
+                          className="w-full bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-800 focus:ring-1 focus:ring-emerald-600 focus:outline-none"
+                        >
+                          <option value="all">All CDS Groups</option>
+                          {cdsGroups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-stone-500 mb-1">
+                          Filter by Quiz Category
+                        </label>
+                        <select
+                          value={cdsMemberCategoryFilter}
+                          onChange={(e) => setCdsMemberCategoryFilter(e.target.value)}
+                          className="w-full bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-800 focus:ring-1 focus:ring-emerald-600 focus:outline-none"
+                        >
+                          <option value="all">All Categories (Best Score)</option>
+                          <option value="ai_emerging_tech">AI &amp; Emerging Technology</option>
+                          <option value="career_employability">Career &amp; Employability</option>
+                          <option value="digital_business_entrepreneurship">Digital Business &amp; Entrepreneurship</option>
+                          <option value="digital_literacy_safety">Digital Literacy &amp; Online Safety</option>
+                          <option value="productivity_digital_tools">Productivity &amp; Digital Tools</option>
+                          <option value="data_digital_skills">Data &amp; Digital Skills</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2 w-full bg-white border border-stone-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-stone-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={cdsMemberQualifiedOnly}
+                            onChange={(e) => setCdsMemberQualifiedOnly(e.target.checked)}
+                            className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                          />
+                          <span>Qualified Only (≥ 6/10)</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Top Performer Highlight Card */}
+                    {cdsMemberRankings.length > 0 && (() => {
+                      const topRankers = cdsMemberRankings.filter((m) => m.rank === 1);
+                      const leader = topRankers[0];
+                      const qualifiedCount = cdsMemberRankings.filter((m) => m.qualifying).length;
+
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-2 p-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xs flex items-center justify-between gap-3">
+                            <div className="space-y-0.5 min-w-0">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-100 flex items-center gap-1">
+                                <Trophy className="w-3.5 h-3.5 text-white" />
+                                <span>
+                                  {topRankers.length > 1
+                                    ? `Top CDS Performers (${topRankers.length}-Way Tie)`
+                                    : 'Top CDS Member (Highest Score & Fastest Time)'}
+                                </span>
+                              </span>
+                              <p className="text-base font-black truncate">
+                                {topRankers.map((t) => t.memberName).join(' & ')}
+                              </p>
+                              <p className="text-[11px] text-amber-100 truncate">
+                                {leader.cdsGroupName} • {leader.categoryName}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0 bg-white/15 px-3 py-2 rounded-xl border border-white/20">
+                              <div className="text-lg font-black leading-none">
+                                {leader.score}/{leader.totalQuestions}
+                              </div>
+                              <div className="text-[10px] font-mono text-amber-100 mt-1 flex items-center justify-end gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>{leader.timeTakenDisplay}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex flex-col justify-center space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-stone-500 font-semibold">Ranked CDS Members:</span>
+                              <span className="font-black text-stone-900">{cdsMemberRankings.length}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-stone-500 font-semibold">Qualifying (≥ 6/10):</span>
+                              <span className="font-black text-emerald-700">{qualifiedCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-stone-500 font-semibold">Total Registered CDS:</span>
+                              <span className="font-bold text-stone-700">
+                                {cdsDashboardData?.totalCDSMembers ?? 0}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Ranked CDS Members Table */}
+                    <div className="overflow-x-auto border border-stone-200 rounded-xl max-h-96 overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-stone-100 text-stone-700 font-bold border-b border-stone-200 text-[11px] sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-3">Rank</th>
+                            <th className="py-2.5 px-3">Member</th>
+                            <th className="py-2.5 px-3">CDS Group</th>
+                            <th className="py-2.5 px-3">Category</th>
+                            <th className="py-2.5 px-3 text-center bg-emerald-50 text-emerald-950">Score</th>
+                            <th className="py-2.5 px-3 text-center bg-amber-50 text-amber-950">Speed (Time)</th>
+                            <th className="py-2.5 px-3 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-200">
+                          {cdsMemberRankings.length > 0 ? (
+                            cdsMemberRankings.map((member) => {
+                              const isTop = member.rank === 1;
+                              return (
+                                <tr
+                                  key={member.participantId}
+                                  className={isTop ? 'bg-amber-50/50 font-semibold' : 'hover:bg-stone-50'}
+                                >
+                                  <td className="py-2.5 px-3 whitespace-nowrap">
+                                    {isTop ? (
+                                      <span className="inline-flex items-center gap-1 font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full text-[11px]">
+                                        <Trophy className="w-3 h-3" />
+                                        #{member.displayRank}
+                                      </span>
+                                    ) : (
+                                      <span className="font-mono font-bold text-stone-700">
+                                        #{member.displayRank}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <div className="font-bold text-stone-900">{member.memberName}</div>
+                                    <div className="text-[10px] font-mono text-stone-500">{member.stateCode}</div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-stone-700 font-medium">
+                                    {member.cdsGroupName}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <span className="inline-block px-2 py-0.5 rounded bg-stone-100 text-stone-700 text-[10px] font-semibold border border-stone-200">
+                                      {member.categoryName}
+                                    </span>
+                                    {member.attemptsCount > 1 && cdsMemberCategoryFilter === 'all' && (
+                                      <div className="text-[10px] text-stone-400 mt-0.5">
+                                        Best of {member.attemptsCount} categories
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center font-mono font-black text-emerald-800 bg-emerald-50/30">
+                                    {member.score}/{member.totalQuestions}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-center font-mono font-bold text-amber-900 bg-amber-50/30 whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-amber-600" />
+                                      {member.timeTakenDisplay}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                    {member.qualifying ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                        Qualified
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-600">
+                                        Below 6
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-stone-400 italic">
+                                {isLoadingCDS
+                                  ? 'Loading CDS member quiz rankings...'
+                                  : 'No CDS member quiz completions match the selected filters yet.'}
                               </td>
                             </tr>
                           )}
@@ -1943,122 +2366,563 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
               )}
 
               {/* TAB 8: LEARNING ACADEMY MANAGEMENT */}
-              {activeTab === 'academy' && (
-                <div className="space-y-6">
-                  {/* Top Header Card */}
-                  <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-indigo-950 text-white rounded-2xl p-6 border border-emerald-800 shadow-sm">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          <GraduationCap className="w-4 h-4 text-emerald-400" />
-                          <span>Digital Corps Hub Academy Portal</span>
-                        </div>
-                        <h3 className="text-xl font-black text-white">
-                          Learning Academy & Curriculum Management
-                        </h3>
-                        <p className="text-xs text-stone-300 max-w-xl">
-                          Inspect the 6 aligned digital tracks, verify 100% question-to-objective mappings, and review participant capstone project submissions.
-                        </p>
-                      </div>
+              {activeTab === 'academy' && (() => {
+                const totalModulesCount = ALL_ACADEMY_COURSES.reduce((acc, c) => acc + c.modules.length, 0);
+                const totalLessonsCount = ALL_ACADEMY_COURSES.reduce(
+                  (acc, c) => acc + c.modules.reduce((mAcc, m) => mAcc + m.lessons.length, 0),
+                  0
+                );
+                const pendingReviewCount = academySubmissions.filter(
+                  (s) => s.submissionStatus === 'submitted' || s.submissionStatus === 'under_review'
+                ).length;
 
-                      <div className="flex items-center gap-2">
+                const selectedCourseObj =
+                  academyFilterCourse !== 'all' ? getCourseById(academyFilterCourse) : undefined;
+                const availableFilterModules = selectedCourseObj ? selectedCourseObj.modules : [];
+
+                const learnerQuery = academyFilterLearner.trim().toLowerCase();
+
+                const filteredProgressRecords = academyProgressList.filter((p) => {
+                  const course = getCourseById(p.courseId);
+                  if (!course) return false;
+                  const sub = academySubmissions.find(
+                    (s) => s.courseId === p.courseId && s.participantId === p.participantId
+                  );
+                  const summary = getCourseCompletionSummary(p, course, sub, academyConfig);
+
+                  if (academyFilterCourse !== 'all' && p.courseId !== academyFilterCourse) return false;
+                  if (academyFilterModule !== 'all') {
+                    const hasModLessonsOrCheck =
+                      p.completedModuleIds?.includes(academyFilterModule) ||
+                      p.moduleCheckScores?.[academyFilterModule] !== undefined;
+                    if (!hasModLessonsOrCheck) return false;
+                  }
+                  if (learnerQuery) {
+                    const hay = `${p.participantName || ''} ${p.participantId} ${p.stateCode || ''}`.toLowerCase();
+                    if (!hay.includes(learnerQuery)) return false;
+                  }
+                  if (academyFilterPlatoon !== 'all') {
+                    if (academyFilterPlatoon === 'unassigned') {
+                      if (p.platoon && p.platoon > 0) return false;
+                    } else if (String(p.platoon || 0) !== academyFilterPlatoon) {
+                      return false;
+                    }
+                  }
+                  if (academyFilterCompletion === 'completed' && p.courseStatus !== 'completed') return false;
+                  if (academyFilterCompletion === 'in_progress' && p.courseStatus !== 'in_progress') return false;
+                  if (academyFilterCompletion === 'certificate_eligible' && !summary.certificateEligible) return false;
+
+                  if (academyFilterAssessment === 'passed' && !summary.finalAssessmentPassed) return false;
+                  if (
+                    academyFilterAssessment === 'failed' &&
+                    ((p.finalAssessmentAttempts || 0) === 0 || summary.finalAssessmentPassed)
+                  ) {
+                    return false;
+                  }
+                  if (academyFilterAssessment === 'not_attempted' && (p.finalAssessmentAttempts || 0) > 0) {
+                    return false;
+                  }
+
+                  const subStatus = sub?.submissionStatus || 'none';
+                  if (academyFilterSubmission !== 'all' && subStatus !== academyFilterSubmission) return false;
+
+                  return true;
+                });
+
+                const filteredSubmissions = academySubmissions.filter((sub) => {
+                  if (academyFilterCourse !== 'all' && sub.courseId !== academyFilterCourse) return false;
+                  if (learnerQuery) {
+                    const hay = `${sub.participantName || ''} ${sub.participantId} ${sub.stateCode || ''}`.toLowerCase();
+                    if (!hay.includes(learnerQuery)) return false;
+                  }
+                  if (academyFilterPlatoon !== 'all') {
+                    if (academyFilterPlatoon === 'unassigned') {
+                      if (sub.platoon && sub.platoon > 0) return false;
+                    } else if (String(sub.platoon || 0) !== academyFilterPlatoon) {
+                      return false;
+                    }
+                  }
+                  if (academyFilterSubmission !== 'all' && sub.submissionStatus !== academyFilterSubmission) {
+                    return false;
+                  }
+                  return true;
+                });
+
+                return (
+                  <div className="space-y-6">
+                    {/* Top Header Card */}
+                    <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-indigo-950 text-white rounded-2xl p-6 border border-emerald-800 shadow-sm">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <GraduationCap className="w-4 h-4 text-emerald-400" />
+                            <span>Digital Corps Hub Academy Portal</span>
+                          </div>
+                          <h3 className="text-xl font-black text-white">
+                            Learning Academy & Curriculum Management
+                          </h3>
+                          <p className="text-xs text-stone-300 max-w-xl">
+                            Manage all {ALL_ACADEMY_COURSES.length} tracks, publish status, pass marks, capstone rubrics, learner analytics, and project reviews.
+                          </p>
+                        </div>
+
                         <button
                           type="button"
                           onClick={handleLoadAcademySubmissions}
                           disabled={isLoadingAcademySubs}
-                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAcademySubs ? 'animate-spin' : ''}`} />
-                          <span>Refresh Submissions</span>
+                          <span>Refresh Academy Data</span>
                         </button>
                       </div>
-                    </div>
 
-                    {/* Stats strip */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/10 text-xs">
-                      <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                        <span className="text-[10px] text-stone-400 uppercase font-mono block">Courses</span>
-                        <span className="text-lg font-black text-emerald-400">6 Tracks</span>
-                      </div>
-                      <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                        <span className="text-[10px] text-stone-400 uppercase font-mono block">Curriculum Depth</span>
-                        <span className="text-lg font-black text-white">24 Modules • 72 Lessons</span>
-                      </div>
-                      <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                        <span className="text-[10px] text-stone-400 uppercase font-mono block">Question Alignment</span>
-                        <span className="text-lg font-black text-emerald-400">180 / 180 (100%)</span>
-                      </div>
-                      <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
-                        <span className="text-[10px] text-stone-400 uppercase font-mono block">Submissions Pending</span>
-                        <span className="text-lg font-black text-amber-400">
-                          {academySubmissions.filter(s => s.submissionStatus === 'submitted').length} Pending
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 100% QUESTION-TO-COURSE COVERAGE REPORT */}
-                  {(() => {
-                    const coverageReport = generateQuestionCoverageReport();
-
-                    return (
-                      <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="w-4 h-4 text-emerald-600" />
-                              <h4 className="font-bold text-stone-900 text-sm">
-                                Question-to-Course Objective Mapping Coverage Report
-                              </h4>
-                            </div>
-                            <p className="text-xs text-stone-500">
-                              Every single active question across all 6 quiz categories is systematically linked to a course, module, lesson, and learning objective.
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-black text-xs rounded-full border border-emerald-200">
-                              {coverageReport.coveragePercentage}% Coverage Verified
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setShowCoverageDetails(prev => !prev)}
-                              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline"
-                            >
-                              {showCoverageDetails ? 'Hide Question Breakdown' : 'View Question Breakdown'}
-                            </button>
-                          </div>
+                      {/* Stats strip */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-white/10 text-xs">
+                        <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
+                          <span className="text-[10px] text-stone-400 uppercase font-mono block">Courses</span>
+                          <span className="text-lg font-black text-emerald-400">
+                            {ALL_ACADEMY_COURSES.length} Tracks
+                          </span>
                         </div>
+                        <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
+                          <span className="text-[10px] text-stone-400 uppercase font-mono block">Curriculum Depth</span>
+                          <span className="text-lg font-black text-white">
+                            {totalModulesCount} Modules • {totalLessonsCount} Lessons
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
+                          <span className="text-[10px] text-stone-400 uppercase font-mono block">Learner Enrolments</span>
+                          <span className="text-lg font-black text-emerald-400">
+                            {academyProgressList.length} Records
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-white/5 rounded-xl border border-white/10">
+                          <span className="text-[10px] text-stone-400 uppercase font-mono block">Submissions Pending</span>
+                          <span className="text-lg font-black text-amber-400">
+                            {pendingReviewCount} Pending
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                        {/* Category Coverage Table */}
+                    {academyAdminNotice && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 font-semibold flex items-center justify-between gap-2">
+                        <span>{academyAdminNotice}</span>
+                        <button
+                          type="button"
+                          onClick={() => setAcademyAdminNotice(null)}
+                          className="text-emerald-700 hover:text-emerald-950 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* COURSES CATALOG, SETTINGS & CURRICULUM INSPECTOR */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-stone-900 text-sm">
+                          Academy Courses Catalog & Configuration ({ALL_ACADEMY_COURSES.length} Tracks)
+                        </h4>
+                        {isSavingAcademyConfig && (
+                          <span className="text-xs text-emerald-700 font-semibold">Saving configuration...</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {ALL_ACADEMY_COURSES.map((course) => {
+                          const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+                          const isPublished = isCourseEffectivelyPublished(course, academyConfig);
+                          const passThreshold = getEffectiveCoursePassThreshold(course, academyConfig);
+
+                          return (
+                            <div
+                              key={course.courseId}
+                              className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3 flex flex-col justify-between"
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 capitalize truncate">
+                                    {course.categoryId.replace(/_/g, ' ')}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={isSavingAcademyConfig}
+                                    onClick={() => handleToggleCoursePublished(course)}
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border cursor-pointer ${
+                                      isPublished
+                                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                        : 'bg-stone-200 text-stone-700 border-stone-300'
+                                    }`}
+                                  >
+                                    {isPublished ? 'Published' : 'Unpublished'}
+                                  </button>
+                                </div>
+                                <h5 className="font-bold text-stone-900 text-sm leading-snug">
+                                  {course.title}
+                                </h5>
+                                <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
+                                  {course.subtitle || course.description}
+                                </p>
+                              </div>
+
+                              <div className="pt-3 border-t border-stone-100 text-[11px] text-stone-500 space-y-2">
+                                <div className="flex justify-between">
+                                  <span>Curriculum:</span>
+                                  <strong className="text-stone-800">
+                                    {course.modules.length} Modules • {totalLessons} Lessons
+                                  </strong>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Assessment ({course.finalAssessment.length} Qs) Pass %:</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={40}
+                                      max={100}
+                                      defaultValue={passThreshold}
+                                      onBlur={(e) => {
+                                        const val = Number(e.target.value);
+                                        if (val !== passThreshold) {
+                                          handleUpdateCoursePassMark(course.courseId, val);
+                                        }
+                                      }}
+                                      className="w-14 text-right px-1.5 py-0.5 border border-stone-300 rounded font-bold text-stone-900 text-[11px]"
+                                    />
+                                    <span>%</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setInspectingCourse(course)}
+                                    className="flex-1 px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold rounded-lg text-[11px] cursor-pointer"
+                                  >
+                                    Inspect Modules
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const existingRubric =
+                                        academyConfig.capstoneRubricOverrides?.[course.courseId] ||
+                                        course.capstoneProject.rubric ||
+                                        course.capstoneProject.assessmentCriteria.map((c, idx) => ({
+                                          id: `crit_${idx + 1}`,
+                                          criterion: c,
+                                          description: c,
+                                          weight: Math.round(100 / Math.max(1, course.capstoneProject.assessmentCriteria.length))
+                                        }));
+                                      setDraftRubricCriteria(existingRubric);
+                                      setEditingRubricCourse(course);
+                                    }}
+                                    className="flex-1 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg text-[11px] border border-indigo-200 cursor-pointer"
+                                  >
+                                    Edit Rubric
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* LEARNER PROGRESS, ASSESSMENT & SUBMISSION FILTERS */}
+                    <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+                            <Filter className="w-4 h-4 text-emerald-600" />
+                            <span>Learner Enrolments, Module Checks & Final Assessments</span>
+                          </h4>
+                          <p className="text-xs text-stone-500">
+                            Filter learner progress and capstone submissions by course, module, learner, platoon, completion, assessment, and submission status.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAcademyFilterCourse('all');
+                            setAcademyFilterModule('all');
+                            setAcademyFilterLearner('');
+                            setAcademyFilterPlatoon('all');
+                            setAcademyFilterCompletion('all');
+                            setAcademyFilterAssessment('all');
+                            setAcademyFilterSubmission('all');
+                          }}
+                          className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
+
+                      {/* 7-Filter Control Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+                        <select
+                          value={academyFilterCourse}
+                          onChange={(e) => {
+                            setAcademyFilterCourse(e.target.value);
+                            setAcademyFilterModule('all');
+                          }}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium"
+                        >
+                          <option value="all">All Courses</option>
+                          {ALL_ACADEMY_COURSES.map((c) => (
+                            <option key={c.courseId} value={c.courseId}>
+                              {c.title}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={academyFilterModule}
+                          onChange={(e) => setAcademyFilterModule(e.target.value)}
+                          disabled={availableFilterModules.length === 0}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium disabled:opacity-50"
+                        >
+                          <option value="all">All Modules</option>
+                          {availableFilterModules.map((m) => (
+                            <option key={m.moduleId} value={m.moduleId}>
+                              {m.sequenceLabel}: {m.title}
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="text"
+                          value={academyFilterLearner}
+                          onChange={(e) => setAcademyFilterLearner(e.target.value)}
+                          placeholder="Search learner/state code..."
+                          className="p-2 border border-stone-300 rounded-lg bg-white"
+                        />
+
+                        <select
+                          value={academyFilterPlatoon}
+                          onChange={(e) => setAcademyFilterPlatoon(e.target.value)}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium"
+                        >
+                          <option value="all">All Platoons</option>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                            <option key={num} value={String(num)}>
+                              Platoon {num}
+                            </option>
+                          ))}
+                          <option value="unassigned">Post-Camp / Unassigned</option>
+                        </select>
+
+                        <select
+                          value={academyFilterCompletion}
+                          onChange={(e) => setAcademyFilterCompletion(e.target.value)}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium"
+                        >
+                          <option value="all">Any Completion</option>
+                          <option value="completed">Completed</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="certificate_eligible">Certificate Eligible</option>
+                        </select>
+
+                        <select
+                          value={academyFilterAssessment}
+                          onChange={(e) => setAcademyFilterAssessment(e.target.value)}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium"
+                        >
+                          <option value="all">Any Assessment</option>
+                          <option value="passed">Passed</option>
+                          <option value="failed">Attempted (Not Passed)</option>
+                          <option value="not_attempted">Not Attempted</option>
+                        </select>
+
+                        <select
+                          value={academyFilterSubmission}
+                          onChange={(e) => setAcademyFilterSubmission(e.target.value)}
+                          className="p-2 border border-stone-300 rounded-lg bg-stone-50 font-medium"
+                        >
+                          <option value="all">Any Submission</option>
+                          <option value="draft">Draft</option>
+                          <option value="submitted">Submitted</option>
+                          <option value="under_review">Under Review</option>
+                          <option value="approved">Approved</option>
+                          <option value="revision_requested">Revision Requested</option>
+                          <option value="rejected">Rejected</option>
+                        </select>
+                      </div>
+
+                      {/* Filtered Learner Progress Table */}
+                      <div className="overflow-x-auto border border-stone-200 rounded-xl">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold uppercase text-[10px]">
+                            <tr>
+                              <th className="p-3">Learner</th>
+                              <th className="p-3">Course</th>
+                              <th className="p-3 text-center">Lessons</th>
+                              <th className="p-3 text-center">Module Checks</th>
+                              <th className="p-3 text-center">Final Exam</th>
+                              <th className="p-3 text-center">Capstone</th>
+                              <th className="p-3 text-right">Certificate</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
+                            {filteredProgressRecords.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="p-6 text-center text-stone-500">
+                                  No learner progress records match the current filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredProgressRecords.slice(0, 80).map((p) => {
+                                const course = getCourseById(p.courseId);
+                                if (!course) return null;
+                                const sub = academySubmissions.find(
+                                  (s) => s.courseId === p.courseId && s.participantId === p.participantId
+                                );
+                                const summary = getCourseCompletionSummary(p, course, sub, academyConfig);
+
+                                return (
+                                  <tr key={`${p.courseId}_${p.participantId}`} className="hover:bg-stone-50/50">
+                                    <td className="p-3">
+                                      <span className="font-bold text-stone-900 block">
+                                        {p.participantName || p.participantId}
+                                      </span>
+                                      <span className="text-[10px] text-stone-500 font-mono">
+                                        {p.platoon ? `Platoon ${p.platoon}` : 'Post-Camp'} {p.stateCode ? `• ${p.stateCode}` : ''}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 max-w-[200px] truncate">{course.title}</td>
+                                    <td className="p-3 text-center font-mono">
+                                      {summary.completedLessonsCount}/{summary.totalLessonsCount}
+                                    </td>
+                                    <td className="p-3 text-center font-mono">
+                                      {summary.completedModuleChecksCount}/{summary.requiredModuleChecksCount}
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      {summary.finalAssessmentBestScore > 0 ? (
+                                        <span
+                                          className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                                            summary.finalAssessmentPassed
+                                              ? 'bg-emerald-100 text-emerald-800'
+                                              : 'bg-rose-100 text-rose-800'
+                                          }`}
+                                        >
+                                          {summary.finalAssessmentBestScore}%
+                                        </span>
+                                      ) : (
+                                        <span className="text-stone-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="p-3 text-center capitalize text-[11px]">
+                                      {sub?.submissionStatus?.replace('_', ' ') || 'none'}
+                                    </td>
+                                    <td className="p-3 text-right">
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                          summary.certificateEligible
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : 'bg-stone-100 text-stone-600'
+                                        }`}
+                                      >
+                                        {summary.certificateEligible ? 'Eligible' : `${summary.overallCompletionPct}%`}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* CAPSTONE PROJECT SUBMISSIONS & EVALUATION */}
+                    <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-indigo-600" />
+                            <span>Participant Capstone Project Submissions ({filteredSubmissions.length})</span>
+                          </h4>
+                          <p className="text-xs text-stone-500">
+                            Inspect submitted deliverables, score each rubric criterion, and update review status.
+                          </p>
+                        </div>
+                      </div>
+
+                      {isLoadingAcademySubs ? (
+                        <div className="p-8 text-center text-xs text-stone-500">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-stone-400" />
+                          Loading submissions from Firestore...
+                        </div>
+                      ) : filteredSubmissions.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-stone-500 bg-stone-50 rounded-xl border border-stone-200">
+                          No capstone submissions match the active filters.
+                        </div>
+                      ) : (
                         <div className="overflow-x-auto border border-stone-200 rounded-xl">
                           <table className="w-full text-left text-xs">
                             <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold uppercase text-[10px]">
                               <tr>
-                                <th className="p-3">Quiz Category</th>
-                                <th className="p-3">Target Academy Course</th>
-                                <th className="p-3 text-center">Active Questions</th>
-                                <th className="p-3 text-center">Mapped Count</th>
-                                <th className="p-3 text-center">Coverage</th>
-                                <th className="p-3 text-right">Status</th>
+                                <th className="p-3">Participant</th>
+                                <th className="p-3">Platoon</th>
+                                <th className="p-3">Course</th>
+                                <th className="p-3">Project Title</th>
+                                <th className="p-3">Links / Files</th>
+                                <th className="p-3">Status</th>
+                                <th className="p-3 text-right">Action</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
-                              {coverageReport.categoryBreakdown.map(c => {
-                                const catCourse = ALL_ACADEMY_COURSES.find(ac => ac.categoryId === c.categoryId);
+                              {filteredSubmissions.map((sub) => {
+                                const primaryLink =
+                                  sub.supportingLinks?.[0]?.url || sub.artifactUrl || sub.submissionUrl;
                                 return (
-                                  <tr key={c.categoryId} className="hover:bg-stone-50/50">
-                                    <td className="p-3 font-bold text-stone-900">{c.categoryId.replace(/_/g, ' ').toUpperCase()}</td>
-                                    <td className="p-3 text-stone-600">{catCourse?.title || c.categoryId}</td>
-                                    <td className="p-3 text-center font-mono">{c.total}</td>
-                                    <td className="p-3 text-center font-mono">{c.mapped}</td>
-                                    <td className="p-3 text-center font-bold text-emerald-700 font-mono">
-                                      {c.coveragePct}%
+                                  <tr key={sub.submissionId || sub.id} className="hover:bg-stone-50/50">
+                                    <td className="p-3 font-bold text-stone-900">{sub.participantName}</td>
+                                    <td className="p-3 font-mono">
+                                      {sub.platoon ? `Platoon ${sub.platoon}` : 'Post-Camp'}
+                                    </td>
+                                    <td className="p-3 text-[11px] text-stone-600">
+                                      {sub.courseTitle || sub.courseId}
+                                    </td>
+                                    <td className="p-3 max-w-xs truncate">{sub.projectTitle}</td>
+                                    <td className="p-3">
+                                      {primaryLink ? (
+                                        <a
+                                          href={primaryLink}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                                        >
+                                          <span>Open Link</span>
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      ) : (
+                                        <span className="text-stone-400">
+                                          {sub.uploadedAttachments?.length || 0} file(s)
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="p-3">
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                          sub.submissionStatus === 'approved'
+                                            ? 'bg-emerald-100 text-emerald-800'
+                                            : sub.submissionStatus === 'rejected' ||
+                                                sub.submissionStatus === 'revision_requested'
+                                              ? 'bg-rose-100 text-rose-800'
+                                              : sub.submissionStatus === 'under_review'
+                                                ? 'bg-blue-100 text-blue-800'
+                                                : 'bg-amber-100 text-amber-800'
+                                        }`}
+                                      >
+                                        {(sub.submissionStatus || 'submitted').replace('_', ' ')}
+                                      </span>
                                     </td>
                                     <td className="p-3 text-right">
-                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
-                                        100% Complete
-                                      </span>
+                                      <button
+                                        onClick={() => openCapstoneReviewModal(sub)}
+                                        className="px-3 py-1 bg-stone-900 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition cursor-pointer"
+                                      >
+                                        Review
+                                      </button>
                                     </td>
                                   </tr>
                                 );
@@ -2066,308 +2930,493 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                             </tbody>
                           </table>
                         </div>
+                      )}
+                    </div>
 
-                        {/* Expandable 180-Question Mappings Breakdown */}
-                        {showCoverageDetails && (
-                          <div className="pt-3 border-t border-stone-100 space-y-2">
-                            <h5 className="font-bold text-stone-800 text-xs">
-                              All 180 Individual Question Objective Mappings:
-                            </h5>
-                            <div className="max-h-80 overflow-y-auto border border-stone-200 rounded-xl p-2 bg-stone-50/50 text-[11px] divide-y divide-stone-200">
-                              {QUESTION_OBJECTIVE_MAPPINGS.map(m => (
-                                <div key={m.questionId} className="py-1.5 px-2 flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 truncate">
-                                    <span className="font-mono font-bold text-stone-800 shrink-0 w-16">
-                                      {m.questionId}
-                                    </span>
-                                    <span className="text-stone-900 font-semibold truncate max-w-xs">
-                                      {m.questionTopic}
-                                    </span>
-                                    <span className="text-stone-400">→</span>
-                                    <span className="text-stone-600 truncate max-w-sm">
-                                      {m.learningObjectiveCode}: {m.lessonTitle}
-                                    </span>
-                                  </div>
-                                  <div className="shrink-0 flex items-center gap-1.5 font-mono text-[10px]">
-                                    <span className="bg-stone-200 px-1.5 py-0.5 rounded text-stone-700">
-                                      {m.courseId}
-                                    </span>
-                                    <span className="bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-800 font-bold">
-                                      {m.lessonId}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
+                    {/* QUESTION-TO-COURSE COVERAGE & GAP RECOMMENDATIONS */}
+                    {(() => {
+                      const coverageReport = generateQuestionCoverageReport();
 
-                  {/* 6 ALIGNED COURSES CATALOG OVERVIEW */}
-                  <div className="space-y-3">
-                    <h4 className="font-bold text-stone-900 text-sm">
-                      Official Academy Courses Catalog (6 Tracks)
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {ALL_ACADEMY_COURSES.map(course => {
-                        const totalLessons = course.modules.reduce((acc, m) => acc + m.lessons.length, 0);
-
-                        return (
-                          <div
-                            key={course.courseId}
-                            className="p-4 bg-white rounded-2xl border border-stone-200 shadow-xs space-y-3 flex flex-col justify-between"
-                          >
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 capitalize">
-                                  {course.categoryId.replace(/_/g, ' ')}
-                                </span>
-                                <span className="text-[11px] text-stone-400 font-mono">
-                                  {course.expectedDuration}
-                                </span>
+                      return (
+                        <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                <h4 className="font-bold text-stone-900 text-sm">
+                                  Quiz Question Mapping & Business Growth Gap Recommendations
+                                </h4>
                               </div>
-                              <h5 className="font-bold text-stone-900 text-sm leading-snug">
-                                {course.title}
-                              </h5>
-                              <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed">
-                                {course.description}
+                              <p className="text-xs text-stone-500">
+                                180 active quiz questions mapped across categories, with dual-track routing for Digital Business &amp; Entrepreneurship.
                               </p>
                             </div>
 
-                            <div className="pt-3 border-t border-stone-100 text-[11px] text-stone-500 space-y-1">
-                              <div className="flex justify-between">
-                                <span>Curriculum Structure:</span>
-                                <strong className="text-stone-800">
-                                  {course.modules.length} Modules • {totalLessons} Lessons
-                                </strong>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Final Assessment:</span>
-                                <strong className="text-stone-800">
-                                  {course.finalAssessment.length} Questions (80% pass)
-                                </strong>
-                              </div>
-                              <div className="flex justify-between truncate">
-                                <span>Capstone:</span>
-                                <strong className="text-stone-800 truncate max-w-[150px]">
-                                  {course.capstoneProject.title}
-                                </strong>
-                              </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-black text-xs rounded-full border border-emerald-200">
+                                {coverageReport.coveragePercentage}% Mapped
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setShowGapRecommendations((prev) => !prev)}
+                                className="text-xs font-bold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+                              >
+                                {showGapRecommendations
+                                  ? 'Hide Question Bank Gap Additions'
+                                  : `View ${RECOMMENDED_ADDITIONAL_BIZ_QUESTIONS.length} Suggested Quiz Additions`}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowCoverageDetails((prev) => !prev)}
+                                className="text-xs font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                              >
+                                {showCoverageDetails ? 'Hide Mappings' : 'View All 180 Mappings'}
+                              </button>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+
+                          {showGapRecommendations && (
+                            <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-3">
+                              <div>
+                                <h5 className="font-bold text-indigo-950 text-xs">
+                                  Recommended Question-Bank Additions for "Grow Your Business Online" Topics
+                                </h5>
+                                <p className="text-[11px] text-indigo-900/80">
+                                  Preserved outside the 180 live quiz questions until an Admin chooses to schedule them in future rounds:
+                                </p>
+                              </div>
+                              <div className="grid md:grid-cols-2 gap-3">
+                                {RECOMMENDED_ADDITIONAL_BIZ_QUESTIONS.map((rec) => (
+                                  <div
+                                    key={rec.suggestedId}
+                                    className="p-3 bg-white rounded-xl border border-indigo-200 text-xs space-y-1.5"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-mono font-bold text-indigo-700">
+                                        {rec.suggestedId} • {rec.targetLessonId}
+                                      </span>
+                                      <span className="text-[10px] uppercase bg-indigo-50 px-2 py-0.5 rounded font-bold text-indigo-800">
+                                        {rec.difficulty}
+                                      </span>
+                                    </div>
+                                    <p className="font-bold text-stone-900">{rec.topicGap}</p>
+                                    <p className="text-stone-700">{rec.suggestedQuestionText}</p>
+                                    <p className="text-[11px] text-emerald-800 font-semibold">
+                                      Answer: {rec.suggestedOptions[rec.correctAnswer]}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {showCoverageDetails && (
+                            <div className="pt-3 border-t border-stone-100 space-y-2">
+                              <div className="max-h-80 overflow-y-auto border border-stone-200 rounded-xl p-2 bg-stone-50/50 text-[11px] divide-y divide-stone-200">
+                                {QUESTION_OBJECTIVE_MAPPINGS.map((m) => (
+                                  <div key={m.questionId} className="py-1.5 px-2 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="font-mono font-bold text-stone-800 shrink-0 w-16">
+                                        {m.questionId}
+                                      </span>
+                                      <span className="text-stone-900 font-semibold truncate max-w-xs">
+                                        {m.questionTopic}
+                                      </span>
+                                      <span className="text-stone-400">→</span>
+                                      <span className="text-stone-600 truncate max-w-sm">
+                                        {m.courseId}
+                                        {m.secondaryCourseId ? ` + ${m.secondaryCourseId}` : ''}
+                                      </span>
+                                    </div>
+                                    <span className="bg-emerald-100 px-1.5 py-0.5 rounded text-emerald-800 font-bold shrink-0 font-mono text-[10px]">
+                                      {m.secondaryLessonId || m.lessonId}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
-
-                  {/* CAPSTONE PROJECT SUBMISSIONS & EVALUATION */}
-                  <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <h4 className="font-bold text-stone-900 text-sm flex items-center gap-2">
-                          <Layers className="w-4 h-4 text-indigo-600" />
-                          <span>Participant Capstone Project Submissions</span>
-                        </h4>
-                        <p className="text-xs text-stone-500">
-                          Review submitted deliverables, assign project scores, and provide qualitative feedback.
-                        </p>
-                      </div>
-
-                      <span className="text-xs text-stone-500 font-mono">
-                        Total Submissions: {academySubmissions.length}
-                      </span>
-                    </div>
-
-                    {isLoadingAcademySubs ? (
-                      <div className="p-8 text-center text-xs text-stone-500">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-stone-400" />
-                        Loading submissions from Firestore...
-                      </div>
-                    ) : academySubmissions.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-stone-500 bg-stone-50 rounded-xl border border-stone-200">
-                        No participant project submissions recorded yet. Submissions appear here in real-time when corps members finish their capstones.
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto border border-stone-200 rounded-xl">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-stone-50 border-b border-stone-200 text-stone-600 font-bold uppercase text-[10px]">
-                            <tr>
-                              <th className="p-3">Participant</th>
-                              <th className="p-3">Platoon</th>
-                              <th className="p-3">Course</th>
-                              <th className="p-3">Project Title</th>
-                              <th className="p-3">Artifact</th>
-                              <th className="p-3">Status</th>
-                              <th className="p-3 text-right">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
-                            {academySubmissions.map(sub => (
-                              <tr key={sub.submissionId || sub.id} className="hover:bg-stone-50/50">
-                                <td className="p-3 font-bold text-stone-900">{sub.participantName}</td>
-                                <td className="p-3 font-mono">{sub.platoon ? `Platoon ${sub.platoon}` : 'Unassigned'}</td>
-                                <td className="p-3 text-[11px] text-stone-600">{sub.courseTitle || sub.courseId}</td>
-                                <td className="p-3 max-w-xs truncate">{sub.projectTitle}</td>
-                                <td className="p-3">
-                                  <a
-                                    href={sub.submissionUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
-                                  >
-                                    <span>Artifact</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                </td>
-                                <td className="p-3">
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                      sub.submissionStatus === 'approved'
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : sub.submissionStatus === 'revision_requested'
-                                        ? 'bg-rose-100 text-rose-800'
-                                        : 'bg-amber-100 text-amber-800'
-                                    }`}
-                                  >
-                                    {sub.submissionStatus}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right">
-                                  <button
-                                    onClick={() => {
-                                      setReviewingSub(sub);
-                                      setReviewFeedback(sub.reviewerFeedback || '');
-                                      setReviewScore(85);
-                                    }}
-                                    className="px-3 py-1 bg-stone-900 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition"
-                                  >
-                                    Review
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
 
-        {/* CAPSTONE REVIEW MODAL */}
-        {reviewingSub && (
+        {/* COURSE MODULES & LESSONS INSPECTOR MODAL */}
+        {inspectingCourse && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-stone-100">
-                <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-emerald-600" />
-                  <span>Review Capstone Submission</span>
-                </h3>
-                <span className="text-xs font-mono text-stone-400">{reviewingSub.courseId}</span>
-              </div>
-
-              <div className="space-y-2 text-xs text-stone-700">
-                <div className="grid grid-cols-2 gap-2 bg-stone-50 p-3 rounded-xl">
-                  <div>
-                    <span className="text-[10px] uppercase text-stone-400 font-bold block">Participant</span>
-                    <strong className="text-stone-900">{reviewingSub.participantName}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase text-stone-400 font-bold block">Platoon</span>
-                    <strong className="text-stone-900">{reviewingSub.platoon ? `Platoon ${reviewingSub.platoon}` : 'Unassigned'}</strong>
-                  </div>
-                </div>
-
+            <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-stone-200 overflow-hidden">
+              <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
                 <div>
-                  <span className="text-[10px] uppercase text-stone-400 font-bold block">Project Title</span>
-                  <p className="font-semibold text-stone-900 text-sm">{reviewingSub.projectTitle}</p>
+                  <span className="text-[11px] font-mono font-bold text-emerald-700 uppercase">
+                    Curriculum Inspector
+                  </span>
+                  <h3 className="font-black text-base text-stone-900">{inspectingCourse.title}</h3>
                 </div>
-
-                <div>
-                  <span className="text-[10px] uppercase text-stone-400 font-bold block">Participant Description</span>
-                  <p className="bg-stone-50 p-3 rounded-lg border border-stone-200 text-xs leading-relaxed">
-                    {reviewingSub.projectDescription}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-[10px] uppercase text-stone-400 font-bold block">Deliverable Artifact</span>
-                  <a
-                    href={reviewingSub.submissionUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-indigo-600 hover:underline font-bold inline-flex items-center gap-1 mt-0.5"
-                  >
-                    {reviewingSub.submissionUrl} <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-
-                <div className="pt-2 border-t border-stone-100 space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-stone-900 mb-1">
-                      Score (0–100)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={reviewScore}
-                      onChange={e => setReviewScore(Number(e.target.value))}
-                      className="w-24 text-xs p-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-stone-900 mb-1">
-                      Coordinator Feedback & Recommendations
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={reviewFeedback}
-                      onChange={e => setReviewFeedback(e.target.value)}
-                      placeholder="Add specific comments on the submission quality, strengths, and areas to polish..."
-                      className="w-full text-xs p-2.5 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-stone-100">
                 <button
                   type="button"
-                  onClick={() => setReviewingSub(null)}
-                  disabled={isSubmittingReview}
-                  className="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800"
+                  onClick={() => setInspectingCourse(null)}
+                  className="p-1.5 text-stone-500 hover:text-stone-900 cursor-pointer"
                 >
-                  Cancel
+                  <X className="w-5 h-5" />
                 </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleReviewSubmission('resubmission_requested')}
-                    disabled={isSubmittingReview}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
-                  >
-                    Request Revision
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReviewSubmission('approved')}
-                    disabled={isSubmittingReview}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50"
-                  >
-                    {isSubmittingReview ? 'Saving...' : 'Approve Project'}
-                  </button>
-                </div>
+              </div>
+              <div className="p-5 overflow-y-auto space-y-4 text-xs">
+                {inspectingCourse.modules.map((m) => (
+                  <div key={m.moduleId} className="border border-stone-200 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-stone-900 text-sm">
+                        {m.sequenceLabel}: {m.title}
+                      </span>
+                      <span className="text-[11px] font-mono text-stone-500">
+                        {m.lessons.length} lessons • {m.knowledgeCheck?.length || 0} module Qs
+                      </span>
+                    </div>
+                    <p className="text-stone-600">{m.description}</p>
+                    <ul className="space-y-1 pl-2 border-l-2 border-emerald-200">
+                      {m.lessons.map((l) => (
+                        <li key={l.lessonId} className="text-stone-800 font-medium">
+                          {l.sequenceLabel}: {l.title} ({l.estimatedDurationMinutes}m • {l.knowledgeCheck.length} checks)
+                        </li>
+                      ))}
+                    </ul>
+                    {m.moduleAssignment && (
+                      <div className="p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-[11px] text-amber-950">
+                        <strong>Assignment:</strong> {m.moduleAssignment.title}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
+
+        {/* CAPSTONE RUBRIC CONFIG MODAL */}
+        {editingRubricCourse && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-stone-200 overflow-hidden">
+              <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+                <div>
+                  <span className="text-[11px] font-mono font-bold text-indigo-700 uppercase">
+                    Configurable Capstone Rubric
+                  </span>
+                  <h3 className="font-black text-base text-stone-900">{editingRubricCourse.title}</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingRubricCourse(null)}
+                  className="p-1.5 text-stone-500 hover:text-stone-900 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5 overflow-y-auto space-y-3 text-xs">
+                {draftRubricCriteria.map((crit, idx) => (
+                  <div key={crit.id} className="p-3 border border-stone-200 rounded-xl space-y-2 bg-stone-50/50">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={crit.criterion}
+                        onChange={(e) =>
+                          setDraftRubricCriteria((prev) =>
+                            prev.map((c, i) => (i === idx ? { ...c, criterion: e.target.value } : c))
+                          )
+                        }
+                        className="flex-1 p-2 border border-stone-300 rounded-lg font-bold text-stone-900 bg-white"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={crit.weight}
+                        onChange={(e) =>
+                          setDraftRubricCriteria((prev) =>
+                            prev.map((c, i) => (i === idx ? { ...c, weight: Number(e.target.value) || 0 } : c))
+                          )
+                        }
+                        className="w-20 p-2 border border-stone-300 rounded-lg font-mono font-bold text-right bg-white"
+                      />
+                      <span>%</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={crit.description}
+                      onChange={(e) =>
+                        setDraftRubricCriteria((prev) =>
+                          prev.map((c, i) => (i === idx ? { ...c, description: e.target.value } : c))
+                        )
+                      }
+                      className="w-full p-2 border border-stone-300 rounded-lg text-stone-600 bg-white"
+                    />
+                  </div>
+                ))}
+                <div className="text-right font-bold text-stone-800">
+                  Total Weight: {draftRubricCriteria.reduce((acc, c) => acc + c.weight, 0)}%
+                </div>
+              </div>
+              <div className="p-4 border-t border-stone-200 bg-stone-50 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRubricCourse(null)}
+                  className="px-4 py-2 text-xs font-bold text-stone-600 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCapstoneRubric}
+                  disabled={isSavingAcademyConfig}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Save Rubric
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CAPSTONE REVIEW MODAL */}
+        {reviewingSub && (() => {
+          const subCourse = getCourseById(reviewingSub.courseId);
+          const activeRubric =
+            academyConfig.capstoneRubricOverrides?.[reviewingSub.courseId] ||
+            subCourse?.capstoneProject.rubric ||
+            [];
+
+          return (
+            <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-stone-200 overflow-hidden">
+                <div className="p-5 flex items-center justify-between pb-3 border-b border-stone-100">
+                  <h3 className="font-bold text-base text-stone-900 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-emerald-600" />
+                    <span>Review Capstone Submission</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setReviewingSub(null)}
+                    className="text-stone-400 hover:text-stone-700 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-5 overflow-y-auto space-y-3 text-xs text-stone-700">
+                  <div className="grid grid-cols-3 gap-2 bg-stone-50 p-3 rounded-xl">
+                    <div>
+                      <span className="text-[10px] uppercase text-stone-400 font-bold block">Participant</span>
+                      <strong className="text-stone-900">{reviewingSub.participantName}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-stone-400 font-bold block">Platoon</span>
+                      <strong className="text-stone-900">
+                        {reviewingSub.platoon ? `Platoon ${reviewingSub.platoon}` : 'Post-Camp'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase text-stone-400 font-bold block">Course</span>
+                      <strong className="text-stone-900">{subCourse?.title || reviewingSub.courseId}</strong>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase text-stone-400 font-bold block">Project Title</span>
+                    <p className="font-semibold text-stone-900 text-sm">{reviewingSub.projectTitle}</p>
+                    {reviewingSub.businessName && (
+                      <p className="text-xs text-stone-600 mt-0.5">
+                        <strong>Business:</strong> {reviewingSub.businessName}{' '}
+                        {reviewingSub.valueProposition ? `• ${reviewingSub.valueProposition}` : ''}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] uppercase text-stone-400 font-bold block">Capstone Description</span>
+                    <p className="bg-stone-50 p-3 rounded-lg border border-stone-200 text-xs leading-relaxed whitespace-pre-line">
+                      {reviewingSub.projectDescription}
+                    </p>
+                  </div>
+
+                  {reviewingSub.deliverablesChecklist &&
+                    Object.keys(reviewingSub.deliverablesChecklist).length > 0 && (
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                        <span className="text-[10px] uppercase text-stone-500 font-bold block">
+                          Deliverables Checked (
+                          {Object.values(reviewingSub.deliverablesChecklist).filter(Boolean).length}/
+                          {Object.keys(reviewingSub.deliverablesChecklist).length})
+                        </span>
+                        <div className="grid sm:grid-cols-2 gap-1 text-[11px]">
+                          {Object.entries(reviewingSub.deliverablesChecklist).map(([item, done]) => (
+                            <div key={item} className={done ? 'text-emerald-800' : 'text-stone-400'}>
+                              {done ? '✓' : '○'} {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Supporting Links & Files */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase text-stone-400 font-bold block">
+                      Supporting Links & Evidence
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {reviewingSub.supportingLinks && reviewingSub.supportingLinks.length > 0 ? (
+                        reviewingSub.supportingLinks.map((lnk, idx) => (
+                          <a
+                            key={idx}
+                            href={lnk.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-indigo-600 hover:underline font-bold inline-flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200"
+                          >
+                            {lnk.label || 'Link'} <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ))
+                      ) : (
+                        (reviewingSub.artifactUrl || reviewingSub.submissionUrl) && (
+                          <a
+                            href={reviewingSub.artifactUrl || reviewingSub.submissionUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-indigo-600 hover:underline font-bold inline-flex items-center gap-1"
+                          >
+                            {reviewingSub.artifactUrl || reviewingSub.submissionUrl} <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )
+                      )}
+                    </div>
+                    {reviewingSub.uploadedAttachments && reviewingSub.uploadedAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {reviewingSub.uploadedAttachments.map((att, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[11px] bg-stone-100 border border-stone-200 px-2 py-1 rounded-lg"
+                          >
+                            📎 {att.name} ({Math.round(att.sizeBytes / 1024)} KB)
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rubric Scoring */}
+                  {activeRubric.length > 0 && (
+                    <div className="pt-2 border-t border-stone-100 space-y-2">
+                      <span className="block text-xs font-bold text-stone-900">
+                        Rubric Evaluation (Adjust points per criterion):
+                      </span>
+                      <div className="space-y-1.5">
+                        {activeRubric.map((r) => (
+                          <div key={r.id} className="flex items-center justify-between gap-2 bg-stone-50 p-2 rounded-lg border border-stone-200">
+                            <span className="text-[11px] font-medium text-stone-800">
+                              {r.criterion} (Max {r.weight})
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={r.weight}
+                              value={reviewRubricScores[r.id] ?? 0}
+                              onChange={(e) => {
+                                const val = Math.min(r.weight, Math.max(0, Number(e.target.value) || 0));
+                                const nextMap = { ...reviewRubricScores, [r.id]: val };
+                                setReviewRubricScores(nextMap);
+                                const sum = activeRubric.reduce(
+                                  (acc, crit) => acc + (nextMap[crit.id] ?? 0),
+                                  0
+                                );
+                                setReviewScore(Math.min(100, sum));
+                              }}
+                              className="w-16 p-1 text-right border border-stone-300 rounded font-bold bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-stone-100 space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-stone-900 mb-1">
+                        Total Score (0–100)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={reviewScore}
+                        onChange={(e) => setReviewScore(Number(e.target.value))}
+                        className="w-24 text-xs p-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-stone-900 mb-1">
+                        Coordinator Feedback &amp; Recommendations
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={reviewFeedback}
+                        onChange={(e) => setReviewFeedback(e.target.value)}
+                        placeholder="Add specific comments on submission quality, strengths, and areas to polish..."
+                        className="w-full text-xs p-2.5 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 bg-stone-50">
+                  <button
+                    type="button"
+                    onClick={() => setReviewingSub(null)}
+                    disabled={isSubmittingReview}
+                    className="px-3 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleReviewSubmission('under_review')}
+                      disabled={isSubmittingReview}
+                      className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      Mark Under Review
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewSubmission('revision_requested')}
+                      disabled={isSubmittingReview}
+                      className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      Request Revision
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewSubmission('rejected')}
+                      disabled={isSubmittingReview}
+                      className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewSubmission('approved')}
+                      disabled={isSubmittingReview}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingReview ? 'Saving...' : 'Approve'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Modal Footer */}
         <div className="px-5 py-3 border-t border-stone-200 bg-stone-50 flex items-center justify-between text-[11px] text-stone-500">

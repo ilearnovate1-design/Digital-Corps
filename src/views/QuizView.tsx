@@ -34,8 +34,11 @@ import {
   GraduationCap
 } from 'lucide-react';
 
-import { QUESTION_OBJECTIVE_MAPPINGS } from '../data/academy/questionObjectiveMappings';
-import { getCourseByCategoryId } from '../data/academy';
+import {
+  QUESTION_OBJECTIVE_MAPPINGS,
+  recommendCourseForQuizResult
+} from '../data/academy/questionObjectiveMappings';
+import { getCourseById, getCourseByCategoryId } from '../data/academy';
 
 interface QuizViewProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -874,11 +877,22 @@ export const QuizView: React.FC<QuizViewProps> = ({
 
         {/* Matching Academy Course Recommendation Card */}
         {(() => {
-          const matchingCourse = getCourseByCategoryId(attemptResult.categoryId);
+          const recommendation = recommendCourseForQuizResult(
+            attemptResult.categoryId,
+            attemptResult.review
+          );
+          const matchingCourse =
+            getCourseById(recommendation.primaryCourseId) ||
+            getCourseByCategoryId(attemptResult.categoryId);
+          const secondaryCourse = recommendation.secondaryCourseId
+            ? getCourseById(recommendation.secondaryCourseId)
+            : undefined;
+          const totalCourseLessons = matchingCourse
+            ? matchingCourse.modules.reduce((acc, m) => acc + m.lessons.length, 0)
+            : 12;
+          const topPriorityLesson = recommendation.priorityLessons[0];
+
           const incorrectReviews = attemptResult.review.filter(r => !r.isCorrect);
-          const firstMissedMapping = incorrectReviews.length > 0
-            ? QUESTION_OBJECTIVE_MAPPINGS.find(m => m.questionId === incorrectReviews[0].questionId)
-            : null;
 
           // Unique strengths from correct answers
           const correctMappings = attemptResult.review
@@ -898,45 +912,67 @@ export const QuizView: React.FC<QuizViewProps> = ({
               {/* Academy Deep Link Hero */}
               {matchingCourse && (
                 <div className="p-6 bg-gradient-to-r from-emerald-900 via-stone-900 to-indigo-950 border border-emerald-700/60 rounded-3xl text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-                  <div className="space-y-2 max-w-lg">
+                  <div className="space-y-2.5 max-w-lg">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       <GraduationCap className="w-4 h-4 text-emerald-400" />
-                      <span>Aligned Digital Corps Hub Course</span>
+                      <span>
+                        {recommendation.secondaryCourseId
+                          ? 'Personalised Track Recommendation'
+                          : 'Aligned Digital Corps Hub Course'}
+                      </span>
                     </div>
                     <h3 className="text-xl font-black text-white tracking-tight">
                       {matchingCourse.title}
                     </h3>
                     <p className="text-xs text-stone-300 leading-relaxed">
-                      {firstMissedMapping
-                        ? `Focus on your detected gap in "${firstMissedMapping.questionTopic}". Learn with real Nigerian PPA case studies, interactive demonstrations, and capstones.`
-                        : matchingCourse.description}
+                      {recommendation.rationale}
                     </p>
-                    <div className="flex items-center gap-3 text-[11px] text-emerald-300 font-mono">
+                    {recommendation.priorityLessons.length > 0 && (
+                      <div className="text-[11px] text-emerald-200/95 bg-white/5 border border-white/10 rounded-xl px-3 py-2 space-y-1">
+                        <span className="font-bold text-amber-300 block">Recommended Priority Lessons:</span>
+                        {recommendation.priorityLessons.slice(0, 3).map((pl) => (
+                          <div key={pl.lessonId} className="truncate">
+                            • {pl.lessonTitle}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-emerald-300 font-mono">
                       <span>{matchingCourse.modules.length} Modules</span>
                       <span>•</span>
-                      <span>12 Comprehensive Lessons</span>
+                      <span>{totalCourseLessons} Comprehensive Lessons</span>
                       <span>•</span>
                       <span>Capstone Project</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row md:flex-col gap-2 w-full md:w-auto shrink-0">
+                  <div className="flex flex-col gap-2 w-full md:w-auto shrink-0">
                     {onNavigateToAcademy && (
                       <button
                         type="button"
                         onClick={() =>
                           onNavigateToAcademy(
                             matchingCourse.courseId,
-                            firstMissedMapping?.lessonId
+                            topPriorityLesson?.lessonId
                           )
                         }
                         className="w-full sm:w-auto px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
                       >
                         <GraduationCap className="w-4 h-4" />
                         <span>
-                          {firstMissedMapping ? 'Start Recommended Lesson' : 'Open Full Course'}
+                          {topPriorityLesson ? 'Start Recommended Lesson' : 'Open Recommended Course'}
                         </span>
                         <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {secondaryCourse && onNavigateToAcademy && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToAcademy(secondaryCourse.courseId)}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 text-amber-200 font-bold rounded-xl text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[230px]">Or try: {secondaryCourse.title}</span>
                       </button>
                     )}
                     <button
@@ -945,7 +981,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
                       className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                     >
                       <GraduationCap className="w-3.5 h-3.5" />
-                      <span>Browse Academy Courses</span>
+                      <span>Browse All Academy Courses</span>
                     </button>
                   </div>
                 </div>
@@ -1102,22 +1138,29 @@ export const QuizView: React.FC<QuizViewProps> = ({
                       </div>
 
                       {/* 1-Click Jump to Lesson in Academy if incorrect */}
-                      {!item.isCorrect && itemMapping && onNavigateToAcademy && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onNavigateToAcademy(
-                              itemMapping.courseId,
-                              itemMapping.lessonId
-                            )
-                          }
-                          className="shrink-0 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition"
-                        >
-                          <GraduationCap className="w-3 h-3" />
-                          <span>Study Lesson</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      )}
+                      {!item.isCorrect && itemMapping && onNavigateToAcademy && (() => {
+                        const rec = recommendCourseForQuizResult(attemptResult.categoryId, attemptResult.review);
+                        const targetCourseId =
+                          itemMapping.secondaryCourseId === rec.primaryCourseId
+                            ? itemMapping.secondaryCourseId
+                            : itemMapping.courseId;
+                        const targetLessonId =
+                          itemMapping.secondaryCourseId === rec.primaryCourseId && itemMapping.secondaryLessonId
+                            ? itemMapping.secondaryLessonId
+                            : itemMapping.lessonId;
+
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onNavigateToAcademy(targetCourseId, targetLessonId)}
+                            className="shrink-0 text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <GraduationCap className="w-3 h-3" />
+                            <span>Study Lesson</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
