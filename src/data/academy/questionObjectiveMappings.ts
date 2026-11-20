@@ -2755,3 +2755,125 @@ export const RECOMMENDED_ADDITIONAL_BIZ_QUESTIONS: QuizQuestionGapRecommendation
   }
 ];
 
+export interface UnifiedAcademyRecommendation {
+  recommendedCourseId: string;
+  recommendedCourseTitle: string;
+  source: 'quiz_category' | 'webdev_placement' | 'webdev_progression' | 'ai_plus_webdev';
+  rationale: string;
+  suggestPlacementCheck: boolean;
+}
+
+/**
+ * Combines Quiz results, optional Web Dev learner interest, Web Dev placement evaluation,
+ * and prior course completion without forcing Web Development onto unrelated quiz categories.
+ */
+export function recommendWebDevOrAcademyTrack(params: {
+  categoryId: string;
+  quizPercentage: number;
+  wantsWebDev?: boolean | null;
+  placementResult?: {
+    recommendedCourseId: 'web-development-beginner' | 'web-development-intermediate' | 'web-development-advanced';
+    percentage: number;
+    rationale: string;
+  } | null;
+  completedCourseIds?: string[];
+  fallbackCourseId: string;
+  fallbackCourseTitle: string;
+}): UnifiedAcademyRecommendation {
+  const {
+    categoryId,
+    quizPercentage,
+    wantsWebDev,
+    placementResult,
+    completedCourseIds = [],
+    fallbackCourseId,
+    fallbackCourseTitle
+  } = params;
+
+  const hasCompletedBeginner = completedCourseIds.includes('web-development-beginner');
+  const hasCompletedIntermediate = completedCourseIds.includes('web-development-intermediate');
+  const hasCompletedAdvanced = completedCourseIds.includes('web-development-advanced');
+
+  // If learner explicitly opted into learning Web Development
+  if (wantsWebDev) {
+    if (placementResult) {
+      let targetId = placementResult.recommendedCourseId;
+      // Progression bump if prior track already completed
+      if (targetId === 'web-development-beginner' && hasCompletedBeginner) {
+        targetId = 'web-development-intermediate';
+      }
+      if (targetId === 'web-development-intermediate' && hasCompletedIntermediate) {
+        targetId = 'web-development-advanced';
+      }
+
+      const titles: Record<string, string> = {
+        'web-development-beginner': 'Beginner – Web Development Fundamentals',
+        'web-development-intermediate': 'Intermediate – Modern Web Development with AI',
+        'web-development-advanced': 'Advanced – AI-Powered Full-Stack Development'
+      };
+
+      return {
+        recommendedCourseId: targetId,
+        recommendedCourseTitle: titles[targetId],
+        source: 'webdev_placement',
+        rationale: placementResult.rationale,
+        suggestPlacementCheck: false
+      };
+    }
+
+    if (hasCompletedIntermediate && !hasCompletedAdvanced) {
+      return {
+        recommendedCourseId: 'web-development-advanced',
+        recommendedCourseTitle: 'Advanced – AI-Powered Full-Stack Development',
+        source: 'webdev_progression',
+        rationale:
+          'You have already completed Intermediate Modern Web Development. Advance into Node.js backends, PostgreSQL, OWASP security, RAG, and AI Agents!',
+        suggestPlacementCheck: false
+      };
+    }
+
+    if (hasCompletedBeginner && !hasCompletedIntermediate) {
+      return {
+        recommendedCourseId: 'web-development-intermediate',
+        recommendedCourseTitle: 'Intermediate – Modern Web Development with AI',
+        source: 'webdev_progression',
+        rationale:
+          'Since you completed Beginner Fundamentals, your next recommended step is Intermediate Modern Web Development with React, TypeScript & AI.',
+        suggestPlacementCheck: false
+      };
+    }
+
+    // Suggest placement check for learners wanting Web Dev who haven't taken placement yet
+    if (categoryId === 'ai_emerging_tech' && quizPercentage >= 75) {
+      return {
+        recommendedCourseId: 'web-development-intermediate',
+        recommendedCourseTitle: 'Intermediate – Modern Web Development with AI',
+        source: 'ai_plus_webdev',
+        rationale:
+          'Strong AI Literacy score paired with your Web Development interest! Take the quick Web Dev Placement Check to confirm whether to start at Beginner or jump straight into Intermediate.',
+        suggestPlacementCheck: true
+      };
+    }
+
+    return {
+      recommendedCourseId: 'web-development-beginner',
+      recommendedCourseTitle: 'Beginner – Web Development Fundamentals',
+      source: 'webdev_progression',
+      rationale:
+        'Start with Beginner – Web Development Fundamentals, or take the 16-question Placement Check if you already know HTML, CSS, JavaScript, or React.',
+      suggestPlacementCheck: true
+    };
+  }
+
+  // Otherwise respect the learner's quiz category strictly without forcing Web Dev
+  return {
+    recommendedCourseId: fallbackCourseId,
+    recommendedCourseTitle: fallbackCourseTitle,
+    source: 'quiz_category',
+    rationale:
+      'Matched directly to your selected quiz category so your learning pathway targets your immediate skill goals.',
+    suggestPlacementCheck: false
+  };
+}
+
+

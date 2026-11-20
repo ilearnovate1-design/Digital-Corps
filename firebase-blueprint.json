@@ -364,6 +364,14 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "completedCodingChallengeIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "completedAiLabIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "moduleCheckScores": {
           "type": "object"
         },
@@ -444,6 +452,14 @@
           "minLength": 6,
           "maxLength": 128
         },
+        "submissionType": {
+          "type": "string",
+          "enum": ["capstone", "coding_assignment"]
+        },
+        "moduleId": {
+          "type": "string",
+          "maxLength": 64
+        },
         "participantId": {
           "type": "string",
           "minLength": 4,
@@ -502,6 +518,18 @@
         "valueProposition": {
           "type": "string",
           "maxLength": 1000
+        },
+        "githubRepoUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "liveAppUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "codeSnippet": {
+          "type": "string",
+          "maxLength": 8000
         },
         "deliverablesChecklist": {
           "type": "object"

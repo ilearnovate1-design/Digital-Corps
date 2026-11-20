@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationTab } from '../types';
 import { EVENT_INFO } from '../data/staticContent';
+import { ALL_ACADEMY_COURSES } from '../data/academy';
 import {
   Sparkles,
   ArrowRight,
@@ -218,14 +219,14 @@ export const WelcomeView: React.FC<WelcomeViewProps> = ({
               <GraduationCap className="w-5 h-5" />
             </div>
             <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-              7 Courses
+              {ALL_ACADEMY_COURSES.length} Courses
             </span>
           </div>
           <h3 className="font-bold text-stone-900 text-base mb-1 group-hover:text-emerald-700 transition-colors">
             3. Learning Academy
           </h3>
           <p className="text-xs text-stone-600 leading-relaxed">
-            Master 7 full practical courses with bite-sized lessons, quizzes, Nigerian case studies, and capstone certifications.
+            Master {ALL_ACADEMY_COURSES.length} full practical courses including AI Literacy, Grow Your Business Online, and the 3-level Web Development Academy with live coding practice and capstones.
           </p>
         </div>
 

@@ -6,6 +6,10 @@ import { generateQuizAttempt, evaluateQuizAttempt } from './src/services/quizEng
 import { QuizAttemptSession, QuizAttemptResult } from './src/types';
 import { ACADEMY_COURSES, getCourseById } from './src/data/academy/index';
 import { generateQuestionCoverageReport } from './src/data/academy/questionObjectiveMappings';
+import {
+  WEB_DEV_PLACEMENT_QUESTIONS,
+  evaluateWebDevPlacement
+} from './src/data/academy/webdev/webDevPlacement';
 
 // In-memory session store for anti-cheating session validation
 const activeSessions = new Map<string, QuizAttemptSession>();
@@ -197,6 +201,8 @@ async function startServer() {
         subtitle: c.subtitle,
         description: c.description,
         difficulty: c.difficulty,
+        level: c.level,
+        prerequisites: c.prerequisites || [],
         targetAudience: c.targetAudience,
         expectedDuration: c.expectedDuration,
         moduleCount: c.modules.length,
@@ -413,6 +419,89 @@ async function startServer() {
       });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e?.message });
+    }
+  });
+
+  // 9. Web Development Placement Assessment (Anti-cheat: answers stripped on start)
+  interface PlacementSession {
+    placementToken: string;
+    participantId: string;
+    optionPermutations: Record<string, number[]>;
+    createdAt: number;
+  }
+  const placementSessions = new Map<string, PlacementSession>();
+
+  app.post('/api/academy/placement/start', (req, res) => {
+    try {
+      const { participantId = 'guest_learner' } = req.body || {};
+      const optionPermutations: Record<string, number[]> = {};
+      const clientQuestions = WEB_DEV_PLACEMENT_QUESTIONS.map((q) => {
+        const idxPerm = shuffleArray(q.options.map((_, idx) => idx));
+        optionPermutations[q.id] = idxPerm;
+        return {
+          id: q.id,
+          domain: q.domain,
+          tier: q.tier,
+          questionText: q.questionText,
+          options: idxPerm.map((origIdx) => q.options[origIdx])
+        };
+      });
+
+      const placementToken = `plc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      placementSessions.set(placementToken, {
+        placementToken,
+        participantId,
+        optionPermutations,
+        createdAt: Date.now()
+      });
+
+      const fourHoursAgo = Date.now() - 4 * 60 * 60 * 1000;
+      for (const [token, s] of placementSessions.entries()) {
+        if (s.createdAt < fourHoursAgo) placementSessions.delete(token);
+      }
+
+      return res.json({
+        success: true,
+        placementToken,
+        totalQuestions: clientQuestions.length,
+        questions: clientQuestions
+      });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e?.message || 'Failed to start placement check.' });
+    }
+  });
+
+  app.post('/api/academy/placement/evaluate', (req, res) => {
+    try {
+      const { placementToken, answers = {} } = req.body || {};
+      const session = placementToken ? placementSessions.get(placementToken) : undefined;
+      const evaluation = evaluateWebDevPlacement(answers, session?.optionPermutations);
+
+      const review = WEB_DEV_PLACEMENT_QUESTIONS.map((q) => {
+        const perm = session?.optionPermutations[q.id];
+        const presentedOptions = perm ? perm.map((origIdx) => q.options[origIdx]) : q.options;
+        const presentedCorrect = perm ? perm.indexOf(q.correctAnswer) : q.correctAnswer;
+        const rawUser = answers[q.id];
+        const hasAnswer = rawUser !== undefined && rawUser !== null;
+        return {
+          id: q.id,
+          domain: q.domain,
+          questionText: q.questionText,
+          options: presentedOptions,
+          userAnswer: hasAnswer ? Number(rawUser) : null,
+          correctAnswer: presentedCorrect,
+          isCorrect: hasAnswer && Number(rawUser) === presentedCorrect,
+          explanation: q.explanation
+        };
+      });
+
+      return res.json({
+        success: true,
+        result: evaluation,
+        review
+      });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e?.message || 'Failed to evaluate placement check.' });
     }
   });
 

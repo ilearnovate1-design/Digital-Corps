@@ -6,6 +6,15 @@ import { COURSE_DIGITAL_FOUNDATIONS } from './courseDigitalFoundations';
 import { COURSE_DIGITAL_PRODUCTIVITY } from './courseDigitalProductivity';
 import { COURSE_SPREADSHEET_MASTERY } from './courseSpreadsheetMastery';
 import { COURSE_GROW_YOUR_BUSINESS_ONLINE } from './courseGrowYourBusinessOnline';
+import { COURSE_WEB_DEV_BEGINNER } from './webdev/courseWebDevBeginner';
+import { COURSE_WEB_DEV_INTERMEDIATE } from './webdev/courseWebDevIntermediate';
+import { COURSE_WEB_DEV_ADVANCED } from './webdev/courseWebDevAdvanced';
+
+export const WEB_DEV_COURSE_IDS = [
+  'web-development-beginner',
+  'web-development-intermediate',
+  'web-development-advanced'
+] as const;
 
 export const ACADEMY_COURSES: AcademyCourse[] = [
   COURSE_AI_LITERACY,
@@ -14,10 +23,17 @@ export const ACADEMY_COURSES: AcademyCourse[] = [
   COURSE_GROW_YOUR_BUSINESS_ONLINE,
   COURSE_DIGITAL_FOUNDATIONS,
   COURSE_DIGITAL_PRODUCTIVITY,
-  COURSE_SPREADSHEET_MASTERY
+  COURSE_SPREADSHEET_MASTERY,
+  COURSE_WEB_DEV_BEGINNER,
+  COURSE_WEB_DEV_INTERMEDIATE,
+  COURSE_WEB_DEV_ADVANCED
 ];
 
 export const ALL_ACADEMY_COURSES = ACADEMY_COURSES;
+
+export function getWebDevCourses(): AcademyCourse[] {
+  return ACADEMY_COURSES.filter((c) => c.categoryId === 'web_development_academy');
+}
 
 export function getCourseById(courseId: string): AcademyCourse | undefined {
   return ACADEMY_COURSES.find((c) => c.courseId === courseId);

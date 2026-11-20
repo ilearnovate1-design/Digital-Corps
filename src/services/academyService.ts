@@ -15,13 +15,16 @@ import {
   AcademyCourse,
   AcademyGlobalConfig,
   CapstoneSupportingLink,
-  CapstoneUploadedAttachment
+  CapstoneUploadedAttachment,
+  WebDevPlacementResult
 } from '../types';
-import { ACADEMY_COURSES, getCourseById } from '../data/academy';
+import { ACADEMY_COURSES, getCourseById, getWebDevCourses } from '../data/academy';
 
 const LOCAL_STORAGE_PROGRESS_PREFIX = 'dch_academy_progress_';
 const LOCAL_STORAGE_CONFIG_KEY = 'dch_academy_global_config_v1';
 const LOCAL_STORAGE_SUBMISSION_PREFIX = 'dch_academy_capstone_';
+const LOCAL_STORAGE_ASSIGN_PREFIX = 'dch_academy_assign_';
+const LOCAL_STORAGE_PLACEMENT_PREFIX = 'dch_webdev_placement_';
 
 function stripUndefined<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -558,6 +561,8 @@ export async function submitCapstoneProjectV2(params: {
   deliverablesChecklist?: Record<string, boolean>;
   supportingLinks?: CapstoneSupportingLink[];
   uploadedAttachments?: CapstoneUploadedAttachment[];
+  githubRepoUrl?: string;
+  liveAppUrl?: string;
   artifactUrl?: string;
 }): Promise<{ success: boolean; submission?: CourseProjectSubmission; error?: string }> {
   const submissionId = getDeterministicSubmissionId(params.courseId, params.participantId);
@@ -566,6 +571,7 @@ export async function submitCapstoneProjectV2(params: {
   const payload: CourseProjectSubmission = {
     id: submissionId,
     submissionId,
+    submissionType: 'capstone',
     participantId: params.participantId,
     participantName: params.participantName,
     participantCallUpNumber: params.participantCallUpNumber || '',
@@ -574,16 +580,30 @@ export async function submitCapstoneProjectV2(params: {
     stateCode: params.stateCode || '',
     courseId: params.courseId,
     courseTitle: params.courseTitle || '',
-    projectTitle: params.projectTitle,
-    projectDescription: params.projectDescription,
-    businessName: params.businessName || '',
-    targetCustomerSummary: params.targetCustomerSummary || '',
-    valueProposition: params.valueProposition || '',
+    projectTitle: params.projectTitle.slice(0, 150),
+    projectDescription: params.projectDescription.slice(0, 5000),
+    businessName: (params.businessName || '').slice(0, 150),
+    targetCustomerSummary: (params.targetCustomerSummary || '').slice(0, 1000),
+    valueProposition: (params.valueProposition || '').slice(0, 1000),
+    githubRepoUrl: (params.githubRepoUrl || '').slice(0, 500),
+    liveAppUrl: (params.liveAppUrl || '').slice(0, 500),
     deliverablesChecklist: params.deliverablesChecklist || {},
-    supportingLinks: params.supportingLinks || [],
-    uploadedAttachments: params.uploadedAttachments || [],
-    artifactUrl: params.artifactUrl || params.supportingLinks?.[0]?.url || '',
-    submissionUrl: params.artifactUrl || params.supportingLinks?.[0]?.url || '',
+    supportingLinks: (params.supportingLinks || []).slice(0, 15),
+    uploadedAttachments: (params.uploadedAttachments || []).slice(0, 5),
+    artifactUrl: (
+      params.artifactUrl ||
+      params.liveAppUrl ||
+      params.githubRepoUrl ||
+      params.supportingLinks?.[0]?.url ||
+      ''
+    ).slice(0, 500),
+    submissionUrl: (
+      params.artifactUrl ||
+      params.liveAppUrl ||
+      params.githubRepoUrl ||
+      params.supportingLinks?.[0]?.url ||
+      ''
+    ).slice(0, 500),
     submissionStatus: 'submitted',
     status: 'submitted',
     submittedAt: now,
@@ -906,3 +926,344 @@ export async function reviewCourseProjectSubmission(
     rubricScores
   );
 }
+
+// ============================================================================
+// WEB DEVELOPMENT ACADEMY: PLACEMENT, CODING LABS, MODULE ASSIGNMENTS & DASHBOARD
+// ============================================================================
+
+export async function startWebDevPlacementAssessment(participantId: string): Promise<{
+  placementToken: string;
+  totalQuestions: number;
+  questions: Array<{
+    id: string;
+    domain: string;
+    tier: 'beginner' | 'intermediate' | 'advanced';
+    questionText: string;
+    options: string[];
+  }>;
+}> {
+  const res = await fetch('/api/academy/placement/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantId })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Could not start placement assessment.');
+  }
+  return data;
+}
+
+export async function evaluateWebDevPlacementAssessment(
+  participantId: string,
+  placementToken: string | null,
+  answers: Record<string, number>
+): Promise<{
+  result: WebDevPlacementResult;
+  review: Array<{
+    id: string;
+    domain: string;
+    questionText: string;
+    options: string[];
+    userAnswer: number | null;
+    correctAnswer: number;
+    isCorrect: boolean;
+    explanation: string;
+  }>;
+}> {
+  const res = await fetch('/api/academy/placement/evaluate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ placementToken, answers })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success || !data.result) {
+    throw new Error(data.error || 'Could not evaluate placement assessment.');
+  }
+  saveLocalPlacementResult(participantId, data.result);
+  return { result: data.result, review: data.review || [] };
+}
+
+export function saveLocalPlacementResult(
+  participantId: string,
+  result: WebDevPlacementResult
+): void {
+  try {
+    localStorage.setItem(`${LOCAL_STORAGE_PLACEMENT_PREFIX}${participantId}`, JSON.stringify(result));
+  } catch {}
+}
+
+export function loadLocalPlacementResult(participantId: string): WebDevPlacementResult | null {
+  try {
+    const raw = localStorage.getItem(`${LOCAL_STORAGE_PLACEMENT_PREFIX}${participantId}`);
+    return raw ? (JSON.parse(raw) as WebDevPlacementResult) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function markCodingChallengeCompleted(
+  participantId: string,
+  courseId: string,
+  challengeId: string
+): Promise<ParticipantCourseProgress> {
+  const progress = await getParticipantCourseProgress(participantId, courseId);
+  const existing = progress.completedCodingChallengeIds || [];
+  if (!existing.includes(challengeId)) {
+    progress.completedCodingChallengeIds = [...existing, challengeId].slice(0, 50);
+    await saveParticipantCourseProgress(progress);
+  }
+  return progress;
+}
+
+export async function markAiLabCompleted(
+  participantId: string,
+  courseId: string,
+  labId: string
+): Promise<ParticipantCourseProgress> {
+  const progress = await getParticipantCourseProgress(participantId, courseId);
+  const existing = progress.completedAiLabIds || [];
+  if (!existing.includes(labId)) {
+    progress.completedAiLabIds = [...existing, labId].slice(0, 50);
+    await saveParticipantCourseProgress(progress);
+  }
+  return progress;
+}
+
+export function getDeterministicAssignmentSubmissionId(
+  courseId: string,
+  moduleId: string,
+  participantId: string
+): string {
+  return `sub_${courseId}_${moduleId}_${participantId}`;
+}
+
+export async function saveModuleAssignmentSubmission(params: {
+  participantId: string;
+  participantName: string;
+  stateCode?: string;
+  platoon?: number;
+  courseId: string;
+  courseTitle: string;
+  moduleId: string;
+  moduleTitle: string;
+  projectDescription: string;
+  githubRepoUrl?: string;
+  liveAppUrl?: string;
+  codeSnippet?: string;
+}): Promise<{ success: boolean; submission?: CourseProjectSubmission; error?: string }> {
+  const submissionId = getDeterministicAssignmentSubmissionId(
+    params.courseId,
+    params.moduleId,
+    params.participantId
+  );
+  const now = new Date().toISOString();
+
+  const payload: CourseProjectSubmission = {
+    id: submissionId,
+    submissionId,
+    submissionType: 'coding_assignment',
+    moduleId: params.moduleId,
+    participantId: params.participantId,
+    participantName: params.participantName,
+    stateCode: params.stateCode || '',
+    platoon: params.platoon ?? 0,
+    courseId: params.courseId,
+    courseTitle: params.courseTitle,
+    projectTitle: params.moduleTitle.slice(0, 150),
+    projectDescription: params.projectDescription.slice(0, 5000),
+    githubRepoUrl: (params.githubRepoUrl || '').slice(0, 500),
+    liveAppUrl: (params.liveAppUrl || '').slice(0, 500),
+    codeSnippet: (params.codeSnippet || '').slice(0, 8000),
+    artifactUrl: (params.liveAppUrl || params.githubRepoUrl || '').slice(0, 500),
+    submissionUrl: (params.liveAppUrl || params.githubRepoUrl || '').slice(0, 500),
+    submissionStatus: 'submitted',
+    status: 'submitted',
+    submittedAt: now,
+    updatedAt: now
+  };
+
+  try {
+    localStorage.setItem(
+      `${LOCAL_STORAGE_ASSIGN_PREFIX}${params.courseId}_${params.moduleId}_${params.participantId}`,
+      JSON.stringify(payload)
+    );
+  } catch {}
+
+  try {
+    await setDoc(doc(db, 'courseProjectSubmissions', submissionId), stripUndefined(payload), {
+      merge: true
+    });
+    return { success: true, submission: payload };
+  } catch (err) {
+    console.warn('Could not sync module assignment to Firestore (saved locally):', err);
+    return { success: true, submission: payload };
+  }
+}
+
+export async function loadCourseAssignmentSubmissions(
+  courseId: string,
+  participantId: string
+): Promise<Record<string, CourseProjectSubmission>> {
+  const course = getCourseById(courseId);
+  const result: Record<string, CourseProjectSubmission> = {};
+  if (!course) return result;
+
+  for (const mod of course.modules) {
+    const subId = getDeterministicAssignmentSubmissionId(courseId, mod.moduleId, participantId);
+    try {
+      const snap = await getDoc(doc(db, 'courseProjectSubmissions', subId));
+      if (snap.exists()) {
+        const data = snap.data() as CourseProjectSubmission;
+        result[mod.moduleId] = {
+          ...data,
+          id: snap.id,
+          submissionId: data.submissionId || snap.id,
+          status: data.submissionStatus || data.status || 'submitted',
+          submissionStatus: data.submissionStatus || data.status || 'submitted'
+        };
+        continue;
+      }
+    } catch {}
+
+    try {
+      const cached = localStorage.getItem(
+        `${LOCAL_STORAGE_ASSIGN_PREFIX}${courseId}_${mod.moduleId}_${participantId}`
+      );
+      if (cached) {
+        result[mod.moduleId] = JSON.parse(cached) as CourseProjectSubmission;
+      }
+    } catch {}
+  }
+
+  return result;
+}
+
+export interface WebDevProgressionSummary {
+  activeLevel: 'beginner' | 'intermediate' | 'advanced';
+  activeCourseId: string;
+  activeCourseTitle: string;
+  beginnerPct: number;
+  intermediatePct: number;
+  advancedPct: number;
+  beginnerCompleted: boolean;
+  intermediateCompleted: boolean;
+  advancedCompleted: boolean;
+  nextEligibleCourseId: string | null;
+  nextEligibleLabel: string | null;
+  recommendedNextCourseId: string;
+  recommendedNextLessonId: string | null;
+  recommendedNextLessonTitle: string | null;
+  totalLessonsCompleted: number;
+  totalLessonsAvailable: number;
+  totalCodingChallengesCompleted: number;
+  totalAiLabsCompleted: number;
+}
+
+export function getWebDevProgressionSummary(
+  progressMap: Record<string, ParticipantCourseProgress>,
+  submissions: CourseProjectSubmission[],
+  placementResult?: WebDevPlacementResult | null
+): WebDevProgressionSummary {
+  const webCourses = getWebDevCourses();
+  const findCourse = (id: string) => webCourses.find((c) => c.courseId === id);
+  const subFor = (id: string) =>
+    submissions.find((s) => s.courseId === id && (s.submissionType || 'capstone') === 'capstone');
+
+  const beg = findCourse('web-development-beginner');
+  const int = findCourse('web-development-intermediate');
+  const adv = findCourse('web-development-advanced');
+
+  const begSum = beg
+    ? getCourseCompletionSummary(progressMap[beg.courseId], beg, subFor(beg.courseId))
+    : null;
+  const intSum = int
+    ? getCourseCompletionSummary(progressMap[int.courseId], int, subFor(int.courseId))
+    : null;
+  const advSum = adv
+    ? getCourseCompletionSummary(progressMap[adv.courseId], adv, subFor(adv.courseId))
+    : null;
+
+  const begPct = begSum?.overallCompletionPct ?? 0;
+  const intPct = intSum?.overallCompletionPct ?? 0;
+  const advPct = advSum?.overallCompletionPct ?? 0;
+
+  const begDone = Boolean(begSum?.certificateEligible);
+  const intDone = Boolean(intSum?.certificateEligible);
+  const advDone = Boolean(advSum?.certificateEligible);
+
+  let activeCourse = beg;
+  if (adv && (advPct > 0 || intDone || placementResult?.recommendedLevel === 'advanced')) {
+    activeCourse = adv;
+  } else if (int && (intPct > 0 || begDone || placementResult?.recommendedLevel === 'intermediate')) {
+    activeCourse = int;
+  }
+
+  let nextEligibleCourseId: string | null = null;
+  let nextEligibleLabel: string | null = null;
+  if (begDone && !intDone && intPct === 0) {
+    nextEligibleCourseId = 'web-development-intermediate';
+    nextEligibleLabel = 'Eligible for Intermediate – Modern Web Development with AI';
+  } else if (intDone && !advDone && advPct === 0) {
+    nextEligibleCourseId = 'web-development-advanced';
+    nextEligibleLabel = 'Eligible for Advanced – AI-Powered Full-Stack Development';
+  }
+
+  // Find resume / next uncompleted lesson in active course
+  let recommendedNextLessonId: string | null = null;
+  let recommendedNextLessonTitle: string | null = null;
+  if (activeCourse) {
+    const completedSet = new Set(progressMap[activeCourse.courseId]?.completedLessonIds || []);
+    for (const mod of activeCourse.modules) {
+      const nextLesson = mod.lessons.find((l) => !completedSet.has(l.lessonId));
+      if (nextLesson) {
+        recommendedNextLessonId = nextLesson.lessonId;
+        recommendedNextLessonTitle = `${nextLesson.sequenceLabel}: ${nextLesson.title}`;
+        break;
+      }
+    }
+    if (!recommendedNextLessonId && activeCourse.modules[0]?.lessons[0]) {
+      recommendedNextLessonId = activeCourse.modules[0].lessons[0].lessonId;
+      recommendedNextLessonTitle = `${activeCourse.modules[0].lessons[0].sequenceLabel}: ${activeCourse.modules[0].lessons[0].title}`;
+    }
+  }
+
+  const totalLessonsAvailable = webCourses.reduce(
+    (sum, c) => sum + c.modules.reduce((mSum, m) => mSum + m.lessons.length, 0),
+    0
+  );
+  const totalLessonsCompleted = webCourses.reduce(
+    (sum, c) => sum + (progressMap[c.courseId]?.completedLessonIds.length || 0),
+    0
+  );
+  const totalCodingChallengesCompleted = webCourses.reduce(
+    (sum, c) => sum + (progressMap[c.courseId]?.completedCodingChallengeIds?.length || 0),
+    0
+  );
+  const totalAiLabsCompleted = webCourses.reduce(
+    (sum, c) => sum + (progressMap[c.courseId]?.completedAiLabIds?.length || 0),
+    0
+  );
+
+  return {
+    activeLevel: (activeCourse?.level || 'beginner') as 'beginner' | 'intermediate' | 'advanced',
+    activeCourseId: activeCourse?.courseId || 'web-development-beginner',
+    activeCourseTitle: activeCourse?.title || 'Beginner – Web Development Fundamentals',
+    beginnerPct: begPct,
+    intermediatePct: intPct,
+    advancedPct: advPct,
+    beginnerCompleted: begDone,
+    intermediateCompleted: intDone,
+    advancedCompleted: advDone,
+    nextEligibleCourseId,
+    nextEligibleLabel,
+    recommendedNextCourseId: nextEligibleCourseId || activeCourse?.courseId || 'web-development-beginner',
+    recommendedNextLessonId,
+    recommendedNextLessonTitle,
+    totalLessonsCompleted,
+    totalLessonsAvailable,
+    totalCodingChallengesCompleted,
+    totalAiLabsCompleted
+  };
+}
+

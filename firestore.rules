@@ -272,6 +272,8 @@ service cloud.firestore {
         'lastAccessedLessonId',
         'completedLessonIds',
         'completedModuleIds',
+        'completedCodingChallengeIds',
+        'completedAiLabIds',
         'moduleCheckScores',
         'moduleCheckDetails',
         'finalAssessmentScore',
@@ -298,6 +300,8 @@ service cloud.firestore {
       (!('lastAccessedLessonId' in data) || (data.lastAccessedLessonId is string && data.lastAccessedLessonId.size() <= 64)) &&
       data.completedLessonIds is list && data.completedLessonIds.size() <= 50 &&
       (!('completedModuleIds' in data) || (data.completedModuleIds is list && data.completedModuleIds.size() <= 20)) &&
+      (!('completedCodingChallengeIds' in data) || (data.completedCodingChallengeIds is list && data.completedCodingChallengeIds.size() <= 50)) &&
+      (!('completedAiLabIds' in data) || (data.completedAiLabIds is list && data.completedAiLabIds.size() <= 50)) &&
       (!('moduleCheckScores' in data) || data.moduleCheckScores is map) &&
       (!('moduleCheckDetails' in data) || data.moduleCheckDetails is map) &&
       (!('finalAssessmentScore' in data) || (data.finalAssessmentScore is int && data.finalAssessmentScore >= 0 && data.finalAssessmentScore <= 100)) &&
@@ -341,6 +345,8 @@ service cloud.firestore {
       ]) && data.keys().hasOnly([
         'id',
         'submissionId',
+        'submissionType',
+        'moduleId',
         'participantId',
         'participantName',
         'participantCallUpNumber',
@@ -354,6 +360,9 @@ service cloud.firestore {
         'businessName',
         'targetCustomerSummary',
         'valueProposition',
+        'githubRepoUrl',
+        'liveAppUrl',
+        'codeSnippet',
         'deliverablesChecklist',
         'supportingLinks',
         'uploadedAttachments',
@@ -373,6 +382,8 @@ service cloud.firestore {
       ]) &&
       (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
       data.submissionId is string && data.submissionId.size() >= 6 && data.submissionId.size() <= 128 &&
+      (!('submissionType' in data) || (data.submissionType in ['capstone', 'coding_assignment'])) &&
+      (!('moduleId' in data) || (data.moduleId is string && data.moduleId.size() <= 64)) &&
       data.participantId is string && data.participantId.size() >= 4 && data.participantId.size() <= 64 &&
       data.participantName is string && data.participantName.size() >= 2 && data.participantName.size() <= 100 &&
       (!('participantCallUpNumber' in data) || (data.participantCallUpNumber is string && data.participantCallUpNumber.size() <= 40)) &&
@@ -387,6 +398,9 @@ service cloud.firestore {
       (!('businessName' in data) || (data.businessName is string && data.businessName.size() <= 150)) &&
       (!('targetCustomerSummary' in data) || (data.targetCustomerSummary is string && data.targetCustomerSummary.size() <= 1000)) &&
       (!('valueProposition' in data) || (data.valueProposition is string && data.valueProposition.size() <= 1000)) &&
+      (!('githubRepoUrl' in data) || (data.githubRepoUrl is string && data.githubRepoUrl.size() <= 500)) &&
+      (!('liveAppUrl' in data) || (data.liveAppUrl is string && data.liveAppUrl.size() <= 500)) &&
+      (!('codeSnippet' in data) || (data.codeSnippet is string && data.codeSnippet.size() <= 8000)) &&
       (!('deliverablesChecklist' in data) || data.deliverablesChecklist is map) &&
       (!('supportingLinks' in data) || (data.supportingLinks is list && data.supportingLinks.size() <= 15)) &&
       (!('uploadedAttachments' in data) || (data.uploadedAttachments is list && data.uploadedAttachments.size() <= 5)) &&
@@ -408,7 +422,14 @@ service cloud.firestore {
     match /courseProjectSubmissions/{submissionId} {
       allow create: if isValidId(submissionId) &&
         isValidProjectSubmission(incoming()) &&
-        submissionId == 'sub_' + incoming().courseId + '_' + incoming().participantId &&
+        (
+          submissionId == 'sub_' + incoming().courseId + '_' + incoming().participantId ||
+          (
+            ('moduleId' in incoming()) &&
+            incoming().submissionType == 'coding_assignment' &&
+            submissionId == 'sub_' + incoming().courseId + '_' + incoming().moduleId + '_' + incoming().participantId
+          )
+        ) &&
         incoming().submissionStatus in ['draft', 'submitted'] &&
         !('score' in incoming()) &&
         !('rubricScores' in incoming()) &&
@@ -427,6 +448,8 @@ service cloud.firestore {
             incoming().participantId == existing().participantId &&
             incoming().courseId == existing().courseId &&
             incoming().submissionId == existing().submissionId &&
+            (!('moduleId' in existing()) || incoming().moduleId == existing().moduleId) &&
+            (!('submissionType' in existing()) || incoming().submissionType == existing().submissionType) &&
             !incoming().diff(existing()).affectedKeys().hasAny([
               'score',
               'rubricScores',

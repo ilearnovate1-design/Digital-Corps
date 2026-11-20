@@ -31,14 +31,17 @@ import {
   CheckSquare,
   Compass,
   Target,
-  GraduationCap
+  GraduationCap,
+  Code2
 } from 'lucide-react';
 
 import {
   QUESTION_OBJECTIVE_MAPPINGS,
-  recommendCourseForQuizResult
+  recommendCourseForQuizResult,
+  recommendWebDevOrAcademyTrack
 } from '../data/academy/questionObjectiveMappings';
 import { getCourseById, getCourseByCategoryId } from '../data/academy';
+import { loadLocalPlacementResult } from '../services/academyService';
 
 interface QuizViewProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -93,6 +96,7 @@ export const QuizView: React.FC<QuizViewProps> = ({
   const [attemptResult, setAttemptResult] = useState<QuizAttemptResult | null>(null);
   const [showReviewList, setShowReviewList] = useState<boolean>(true);
   const [copiedShare, setCopiedShare] = useState<boolean>(false);
+  const [wantsWebDev, setWantsWebDev] = useState<boolean>(false);
 
   // Best scores map per category from localStorage
   const [bestScores, setBestScores] = useState<Record<string, { score: number; total: number; date: string }>>({});
@@ -986,6 +990,98 @@ export const QuizView: React.FC<QuizViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Optional Web Development Academy Prompt */}
+              {(() => {
+                const participantId = registeredUser?.registrationId || 'guest_user';
+                const savedPlacement = loadLocalPlacementResult(participantId);
+                const webDevRecommendation = recommendWebDevOrAcademyTrack({
+                  categoryId: attemptResult.categoryId,
+                  quizPercentage: attemptResult.percentage,
+                  wantsWebDev,
+                  placementResult: savedPlacement,
+                  fallbackCourseId: recommendation.primaryCourseId,
+                  fallbackCourseTitle: matchingCourse?.title || 'Academy Course'
+                });
+                const recommendedWebCourse = getCourseById(webDevRecommendation.recommendedCourseId);
+
+                return (
+                  <div className="p-4 sm:p-5 bg-white border border-indigo-200 rounded-2xl shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <span className="p-2 bg-indigo-50 text-indigo-700 rounded-xl shrink-0">
+                          <Code2 className="w-5 h-5" />
+                        </span>
+                        <div>
+                          <h4 className="font-bold text-stone-900 text-xs sm:text-sm">
+                            Would you like to learn web development?
+                          </h4>
+                          <p className="text-[11px] text-stone-600 leading-relaxed">
+                            Optional Track: Explore HTML5, CSS3, JavaScript, React, TypeScript, and AI-Assisted Full-Stack Development from beginner to SaaS.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setWantsWebDev(true)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                            wantsWebDev
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+                          }`}
+                        >
+                          Yes, Recommend Track
+                        </button>
+                        {wantsWebDev && (
+                          <button
+                            type="button"
+                            onClick={() => setWantsWebDev(false)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-stone-500 hover:text-stone-800 cursor-pointer"
+                          >
+                            Hide
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {wantsWebDev && recommendedWebCourse && (
+                      <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-mono uppercase font-bold text-indigo-700">
+                            Suggested Web Dev Entry Point
+                          </span>
+                          <p className="font-bold text-stone-900 text-sm">
+                            {recommendedWebCourse.title}
+                          </p>
+                          <p className="text-stone-700 leading-relaxed">
+                            {webDevRecommendation.rationale}
+                          </p>
+                        </div>
+                        {onNavigateToAcademy && (
+                          <div className="flex flex-wrap sm:flex-col gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => onNavigateToAcademy(recommendedWebCourse.courseId)}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+                            >
+                              <span>Open Web Dev Track</span>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onNavigateToAcademy('__webdev_placement__')}
+                              className="px-4 py-2 bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-300 rounded-xl font-bold text-xs whitespace-nowrap cursor-pointer"
+                            >
+                              {savedPlacement ? 'Retake Placement Check' : 'Take Placement Check'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Strengths & Weaknesses Diagnostic Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

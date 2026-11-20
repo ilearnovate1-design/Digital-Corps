@@ -31,7 +31,17 @@ import {
   Upload,
   ListChecks,
   Wrench,
-  ClipboardCheck
+  ClipboardCheck,
+  Code2,
+  Terminal,
+  Download,
+  Compass,
+  Cpu,
+  AlertTriangle,
+  Copy,
+  Lightbulb,
+  FolderGit2,
+  Globe
 } from 'lucide-react';
 import {
   AcademyCourse,
@@ -43,24 +53,40 @@ import {
   CourseProjectSubmission,
   LessonKnowledgeCheckQuestion,
   ParticipantCourseProgress,
-  RegisteredParticipant
+  RegisteredParticipant,
+  WebDevPlacementResult
 } from '../types';
-import { ALL_ACADEMY_COURSES, getCourseById, getCourseLesson } from '../data/academy';
+import {
+  ALL_ACADEMY_COURSES,
+  WEB_DEV_COURSE_IDS,
+  getCourseById,
+  getCourseLesson,
+  getWebDevCourses
+} from '../data/academy';
 import {
   DEFAULT_ACADEMY_GLOBAL_CONFIG,
   getCourseCompletionSummary,
   getEffectiveCoursePassThreshold,
   getParticipantAllCourseProgress,
+  getWebDevProgressionSummary,
   isCourseEffectivelyPublished,
   loadAcademyGlobalConfig,
+  loadCourseAssignmentSubmissions,
+  loadLocalPlacementResult,
   loadParticipantCourseSubmissions,
+  markAiLabCompleted,
+  markCodingChallengeCompleted,
   saveCapstoneDraft,
   saveLessonProgress,
+  saveModuleAssignmentSubmission,
   saveModuleCheckResult,
   startCourseFinalAssessment,
   submitCapstoneProjectV2,
   submitCourseFinalAssessment
 } from '../services/academyService';
+import { CodingPracticeSandbox } from '../components/academy/CodingPracticeSandbox';
+import { AiDevelopmentLab } from '../components/academy/AiDevelopmentLab';
+import { WebDevPlacementModal } from '../components/academy/WebDevPlacementModal';
 
 interface AcademyViewProps {
   participant?: RegisteredParticipant | null;
@@ -141,8 +167,24 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     { label: 'Main Deliverable / Google Drive Link', url: '' }
   ]);
   const [uploadedAttachments, setUploadedAttachments] = useState<CapstoneUploadedAttachment[]>([]);
+  const [githubRepoUrl, setGithubRepoUrl] = useState('');
+  const [liveAppUrl, setLiveAppUrl] = useState('');
   const [projectSubmitSuccess, setProjectSubmitSuccess] = useState<string | null>(null);
   const [projectSubmitError, setProjectSubmitError] = useState<string | null>(null);
+
+  // Web Development Academy state
+  const [placementResult, setPlacementResult] = useState<WebDevPlacementResult | null>(null);
+  const [showPlacementModal, setShowPlacementModal] = useState<boolean>(false);
+  const [showCourseAiLab, setShowCourseAiLab] = useState<boolean>(false);
+  const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
+  const [moduleAssignments, setModuleAssignments] = useState<Record<string, CourseProjectSubmission>>({});
+  const [openAssignmentModuleId, setOpenAssignmentModuleId] = useState<string | null>(null);
+  const [assignDescription, setAssignDescription] = useState('');
+  const [assignGithubUrl, setAssignGithubUrl] = useState('');
+  const [assignLiveUrl, setAssignLiveUrl] = useState('');
+  const [assignCodeSnippet, setAssignCodeSnippet] = useState('');
+  const [savingAssignment, setSavingAssignment] = useState(false);
+  const [assignFeedback, setAssignFeedback] = useState<string | null>(null);
 
   // Final Assessment state (server-randomized token + sanitized questions)
   const [assessmentLoading, setAssessmentLoading] = useState(false);
@@ -190,12 +232,13 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     return match ? Number(match[0]) : 0;
   }, [participant?.platoon]);
 
-  // Load config, progress, and submissions on mount or participant change
+  // Load config, progress, placement, and submissions on mount or participant change
   useEffect(() => {
     async function loadData() {
       const cfg = await loadAcademyGlobalConfig();
       setGlobalConfig(cfg);
       if (participantId) {
+        setPlacementResult(loadLocalPlacementResult(participantId));
         const pMap = await getParticipantAllCourseProgress(participantId);
         setProgressMap(pMap);
         const userSubs = await loadParticipantCourseSubmissions(participantId, pMap);
@@ -207,6 +250,14 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
 
   // Handle deep-linking from Quiz results or direct links
   useEffect(() => {
+    if (initialCourseId === '__webdev_placement__') {
+      setViewMode('catalog');
+      setSelectedCategoryFilter('web_development_academy');
+      setShowPlacementModal(true);
+      if (onClearDeepLink) onClearDeepLink();
+      return;
+    }
+
     if (initialCourseId) {
       const course = getCourseById(initialCourseId);
       if (course) {
@@ -233,6 +284,17 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     }
   }, [initialCourseId, initialLessonId]);
 
+  // Load module assignment submissions when viewing a course
+  useEffect(() => {
+    if (!selectedCourse || !participantId) return;
+    loadCourseAssignmentSubmissions(selectedCourse.courseId, participantId).then((map) => {
+      setModuleAssignments(map);
+    });
+    setOpenAssignmentModuleId(null);
+    setAssignFeedback(null);
+    setShowCourseAiLab(false);
+  }, [selectedCourse?.courseId, participantId]);
+
   // Sync capstone form state when switching course or loading submissions
   useEffect(() => {
     if (!selectedCourse) return;
@@ -245,6 +307,8 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
       setTargetCustomerSummary(existing.targetCustomerSummary || '');
       setValueProposition(existing.valueProposition || '');
       setProjectDescription(existing.projectDescription || '');
+      setGithubRepoUrl(existing.githubRepoUrl || '');
+      setLiveAppUrl(existing.liveAppUrl || '');
       setDeliverablesChecklist(existing.deliverablesChecklist || {});
       setSupportingLinks(
         existing.supportingLinks && existing.supportingLinks.length > 0
@@ -261,6 +325,8 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
       setTargetCustomerSummary('');
       setValueProposition('');
       setProjectDescription('');
+      setGithubRepoUrl('');
+      setLiveAppUrl('');
       setDeliverablesChecklist({});
       setSupportingLinks([{ label: 'Main Deliverable / Google Drive Link', url: '' }]);
       setUploadedAttachments([]);
@@ -549,6 +615,83 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     e.target.value = '';
   };
 
+  const handleCopyCodeSnippet = (key: string, content: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(content).then(() => {
+        setCopiedSnippetKey(key);
+        setTimeout(() => setCopiedSnippetKey(null), 2000);
+      });
+    }
+  };
+
+  const handleDownloadStarterFile = (filePath: string, content: string) => {
+    const filename = filePath.split('/').pop() || 'starter-file.txt';
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleMarkChallengeDone = async (courseId: string, challengeId: string) => {
+    const updated = await markCodingChallengeCompleted(participantId, courseId, challengeId);
+    setProgressMap((prev) => ({ ...prev, [courseId]: updated }));
+  };
+
+  const handleMarkAiLabDone = async (courseId: string, labId: string) => {
+    const updated = await markAiLabCompleted(participantId, courseId, labId);
+    setProgressMap((prev) => ({ ...prev, [courseId]: updated }));
+  };
+
+  const handleOpenModuleAssignmentForm = (module: CourseModule) => {
+    const existing = moduleAssignments[module.moduleId];
+    setOpenAssignmentModuleId((prev) => (prev === module.moduleId ? null : module.moduleId));
+    setAssignDescription(existing?.projectDescription || '');
+    setAssignGithubUrl(existing?.githubRepoUrl || '');
+    setAssignLiveUrl(existing?.liveAppUrl || '');
+    setAssignCodeSnippet(existing?.codeSnippet || '');
+    setAssignFeedback(null);
+  };
+
+  const handleSubmitModuleAssignment = async (e: React.FormEvent, module: CourseModule) => {
+    e.preventDefault();
+    if (!selectedCourse) return;
+    if (assignDescription.trim().length < 10) {
+      setAssignFeedback('Please provide a short implementation summary (at least 10 characters).');
+      return;
+    }
+    setSavingAssignment(true);
+    setAssignFeedback(null);
+    try {
+      const res = await saveModuleAssignmentSubmission({
+        participantId,
+        participantName: participant?.name || 'Corps Member',
+        stateCode: participant?.stateCode,
+        platoon: participantPlatoonNum,
+        courseId: selectedCourse.courseId,
+        courseTitle: selectedCourse.title,
+        moduleId: module.moduleId,
+        moduleTitle: `${module.sequenceLabel}: ${module.moduleAssignment?.title || module.title}`,
+        projectDescription: assignDescription.trim(),
+        githubRepoUrl: assignGithubUrl.trim(),
+        liveAppUrl: assignLiveUrl.trim(),
+        codeSnippet: assignCodeSnippet.trim()
+      });
+      if (res.submission) {
+        setModuleAssignments((prev) => ({ ...prev, [module.moduleId]: res.submission! }));
+        setAssignFeedback('Module assignment saved! Reviewers can inspect it in the Admin Portal.');
+      }
+    } catch (err: any) {
+      setAssignFeedback(err?.message || 'Could not save module assignment.');
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
+
   const handleSaveCapstoneDraft = async () => {
     if (!selectedCourse) return;
     setIsSavingDraft(true);
@@ -570,10 +713,12 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
         businessName: businessName.trim(),
         targetCustomerSummary: targetCustomerSummary.trim(),
         valueProposition: valueProposition.trim(),
+        githubRepoUrl: githubRepoUrl.trim(),
+        liveAppUrl: liveAppUrl.trim(),
         deliverablesChecklist,
         supportingLinks: cleanedLinks,
         uploadedAttachments,
-        artifactUrl: cleanedLinks[0]?.url || ''
+        artifactUrl: liveAppUrl.trim() || githubRepoUrl.trim() || cleanedLinks[0]?.url || ''
       });
       setSubmissions((prev) => [saved, ...prev.filter((s) => s.courseId !== selectedCourse.courseId)]);
       setProjectSubmitSuccess('Draft saved safely. You can continue refining and submit when ready.');
@@ -588,6 +733,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     e.preventDefault();
     if (!selectedCourse) return;
     const cleanedLinks = supportingLinks.filter((l) => l.url.trim().length > 0);
+    const hasGithubOrLive = githubRepoUrl.trim().length > 0 || liveAppUrl.trim().length > 0;
 
     if (projectTitle.trim().length < 3 || projectDescription.trim().length < 10) {
       setProjectSubmitError(
@@ -595,8 +741,8 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
       );
       return;
     }
-    if (cleanedLinks.length === 0 && uploadedAttachments.length === 0) {
-      setProjectSubmitError('Please include at least one supporting URL (Google Drive, Canva, or social link) or upload an evidence file.');
+    if (!hasGithubOrLive && cleanedLinks.length === 0 && uploadedAttachments.length === 0) {
+      setProjectSubmitError('Please include a GitHub repository / live app URL, supporting deliverable link, or an evidence file.');
       return;
     }
 
@@ -618,10 +764,12 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
         businessName: businessName.trim(),
         targetCustomerSummary: targetCustomerSummary.trim(),
         valueProposition: valueProposition.trim(),
+        githubRepoUrl: githubRepoUrl.trim(),
+        liveAppUrl: liveAppUrl.trim(),
         deliverablesChecklist,
         supportingLinks: cleanedLinks,
         uploadedAttachments,
-        artifactUrl: cleanedLinks[0]?.url || ''
+        artifactUrl: liveAppUrl.trim() || githubRepoUrl.trim() || cleanedLinks[0]?.url || ''
       });
 
       if (!res.success || !res.submission) {
@@ -865,6 +1013,21 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
 
         {/* Main Content Body */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8 space-y-8 mb-6">
+          {/* Lesson Learning Objectives (when defined) */}
+          {selectedLesson.learningObjectives && selectedLesson.learningObjectives.length > 0 && (
+            <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-4 space-y-2">
+              <div className="text-xs font-bold uppercase tracking-wider text-indigo-800 flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-indigo-600" />
+                Lesson Learning Objectives
+              </div>
+              <ul className="space-y-1 text-xs text-slate-800 list-disc pl-5">
+                {selectedLesson.learningObjectives.map((obj, idx) => (
+                  <li key={idx} className="leading-relaxed">{obj}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Detailed Paragraphs */}
           <div className="space-y-4">
             <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">
@@ -876,6 +1039,71 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
               </p>
             ))}
           </div>
+
+          {/* Code Examples Section */}
+          {selectedLesson.codeExamples && selectedLesson.codeExamples.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+                <Code2 className="w-5 h-5 text-indigo-600" />
+                Code Demonstrations & Annotated Explanations
+              </h2>
+              {selectedLesson.codeExamples.map((ex, idx) => {
+                const copyId = `ex_${selectedLesson.lessonId}_${idx}`;
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-slate-200 bg-slate-950 text-slate-100 overflow-hidden shadow-xs"
+                  >
+                    <div className="px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                          {ex.language}
+                        </span>
+                        <span className="text-xs font-bold text-white">{ex.title}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCodeSnippet(copyId, ex.code)}
+                        className="text-[11px] font-semibold text-slate-300 hover:text-white inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedSnippetKey === copyId ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="p-4 text-xs font-mono text-emerald-200 overflow-x-auto leading-relaxed">
+                      <code>{ex.code}</code>
+                    </pre>
+                    {(ex.explanation.length > 0 || ex.expectedOutput) && (
+                      <div className="p-4 bg-slate-900/90 border-t border-slate-800 space-y-2 text-xs">
+                        {ex.explanation.length > 0 && (
+                          <ul className="space-y-1 text-slate-300 list-disc pl-4">
+                            {ex.explanation.map((line, lIdx) => (
+                              <li key={lIdx}>{line}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {ex.expectedOutput && (
+                          <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono text-amber-200">
+                            <strong>Expected Output: </strong>
+                            {ex.expectedOutput}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Step-by-Step Practical Instructions (if defined) */}
           {selectedLesson.stepByStepInstructions && selectedLesson.stepByStepInstructions.length > 0 && (
@@ -895,6 +1123,52 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
                 ))}
               </ol>
             </div>
+          )}
+
+          {/* Common Errors & Fixes */}
+          {selectedLesson.commonErrors && selectedLesson.commonErrors.length > 0 && (
+            <div className="bg-rose-50/60 border border-rose-200 rounded-xl p-5 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                Common Pitfalls &amp; Fixes
+              </div>
+              <div className="space-y-2.5">
+                {selectedLesson.commonErrors.map((ce, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-white border border-rose-200 text-xs space-y-1">
+                    <p className="font-bold text-rose-900">{ce.error}</p>
+                    <p className="text-slate-600">
+                      <strong>Why it happens:</strong> {ce.cause}
+                    </p>
+                    <p className="text-emerald-800 font-medium">
+                      <strong>Fix:</strong> {ce.fix}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Coding Practice Sandbox */}
+          {selectedLesson.codingChallenge && (
+            <CodingPracticeSandbox
+              challenge={selectedLesson.codingChallenge}
+              isCompleted={progressMap[selectedCourse.courseId]?.completedCodingChallengeIds?.includes(
+                selectedLesson.codingChallenge.id
+              )}
+              onMarkCompleted={() =>
+                handleMarkChallengeDone(selectedCourse.courseId, selectedLesson.codingChallenge!.id)
+              }
+            />
+          )}
+
+          {/* Lesson-specific AI Development Lab Challenge */}
+          {selectedLesson.aiLabChallenge && (
+            <AiDevelopmentLab
+              trackLevel={selectedLesson.aiLabChallenge.trackLevel}
+              completedLabIds={progressMap[selectedCourse.courseId]?.completedAiLabIds || []}
+              onMarkLabCompleted={(labId) => handleMarkAiLabDone(selectedCourse.courseId, labId)}
+              activeLessonChallenge={selectedLesson.aiLabChallenge}
+            />
           )}
 
           {/* Nigerian Practical Context & Example */}
@@ -952,6 +1226,18 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
                 <li key={sIdx}>{step}</li>
               ))}
             </ul>
+            {selectedLesson.handsOnExercise.hints && selectedLesson.handsOnExercise.hints.length > 0 && (
+              <div className="p-3 bg-white/80 rounded-lg border border-blue-200 text-xs text-blue-950 space-y-1">
+                <span className="font-bold inline-flex items-center gap-1">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-600" /> Hints:
+                </span>
+                <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                  {selectedLesson.handsOnExercise.hints.map((h, hIdx) => (
+                    <li key={hIdx}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="pt-2 border-t border-blue-200 text-xs text-blue-950 font-bold">
               Deliverable: {selectedLesson.handsOnExercise.deliverable}
             </div>
@@ -1516,6 +1802,30 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
           </div>
         </div>
 
+        {/* Prerequisites / Progression Guidance (Advisory Only - Never Blocks Access) */}
+        {selectedCourse.prerequisites && selectedCourse.prerequisites.length > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="space-y-1">
+              <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-indigo-600" />
+                Recommended Prerequisites &amp; Placement Guidance
+              </span>
+              <p className="text-indigo-900">
+                Recommended background: {selectedCourse.prerequisites.join(' • ')}. You are free to explore any track, or verify readiness with the quick placement check.
+              </p>
+            </div>
+            {(WEB_DEV_COURSE_IDS as readonly string[]).includes(selectedCourse.courseId) && (
+              <button
+                type="button"
+                onClick={() => setShowPlacementModal(true)}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer shrink-0"
+              >
+                Take Placement Check
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Learning Outcomes & Requirements */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -1555,6 +1865,135 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Practical Projects & Starter Templates (Web Dev Academy tracks) */}
+        {((selectedCourse.practicalProjects && selectedCourse.practicalProjects.length > 0) ||
+          (selectedCourse.starterProjectTemplates && selectedCourse.starterProjectTemplates.length > 0)) && (
+          <div className="space-y-6 mb-8">
+            {selectedCourse.practicalProjects && selectedCourse.practicalProjects.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Code2 className="w-5 h-5 text-emerald-600" />
+                    Track Practical Build Projects ({selectedCourse.practicalProjects.length})
+                  </h2>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {selectedCourse.practicalProjects.map((proj, pIdx) => (
+                    <div key={proj.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                        Project {pIdx + 1}
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900">{proj.title}</h3>
+                      <p className="text-xs text-slate-600 leading-relaxed">{proj.summary}</p>
+                      <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-slate-700">
+                        {proj.deliverables.map((del, dIdx) => (
+                          <li key={dIdx}>{del}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedCourse.starterProjectTemplates && selectedCourse.starterProjectTemplates.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <Download className="w-5 h-5 text-indigo-600" />
+                    Downloadable Starter Kits & Local Setup Commands
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Copy or download starter source files directly to run this track's projects locally on your laptop.
+                  </p>
+                </div>
+
+                {selectedCourse.starterProjectTemplates.map((tpl) => (
+                  <div key={tpl.id} className="p-4 rounded-xl bg-slate-900 text-slate-100 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">{tpl.title}</h3>
+                        <p className="text-xs text-slate-300">{tpl.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCodeSnippet(`cmd_${tpl.id}`, tpl.setupCommand)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-mono border border-slate-700 inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0"
+                      >
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>{copiedSnippetKey === `cmd_${tpl.id}` ? 'Command Copied!' : 'Copy Setup Command'}</span>
+                      </button>
+                    </div>
+                    <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono text-amber-200 overflow-x-auto">
+                      {tpl.setupCommand}
+                    </pre>
+                    <div className="grid sm:grid-cols-2 gap-2.5">
+                      {tpl.files.map((file) => (
+                        <div
+                          key={file.path}
+                          className="p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2"
+                        >
+                          <span className="text-xs font-mono text-slate-200 truncate">{file.path}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyCodeSnippet(`f_${tpl.id}_${file.path}`, file.content)}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-200 cursor-pointer"
+                            >
+                              {copiedSnippetKey === `f_${tpl.id}_${file.path}` ? 'Copied' : 'Copy'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadStarterFile(file.path, file.content)}
+                              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-[11px] font-bold text-white inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Download className="w-3 h-3" /> Save
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Embedded AI Development Lab Launcher for Intermediate & Advanced Web Dev */}
+        {(selectedCourse.courseId === 'web-development-intermediate' ||
+          selectedCourse.courseId === 'web-development-advanced') && (
+          <div className="mb-8 space-y-4">
+            <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-300">
+                  <Cpu className="w-4 h-4" /> Integrated Engineering Lab
+                </div>
+                <h3 className="text-base font-bold">
+                  AI Development Lab ({selectedCourse.level === 'advanced' ? 'Advanced Full-Stack' : 'Intermediate Web Dev'})
+                </h3>
+                <p className="text-xs text-slate-300">
+                  Practice spec prompting, sanitized debugging, OWASP PR audits, and code-review challenges directly inside this track.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCourseAiLab((prev) => !prev)}
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black whitespace-nowrap cursor-pointer shrink-0"
+              >
+                {showCourseAiLab ? 'Hide AI Lab' : 'Open AI Development Lab'}
+              </button>
+            </div>
+            {showCourseAiLab && (
+              <AiDevelopmentLab
+                trackLevel={selectedCourse.level === 'advanced' ? 'advanced' : 'intermediate'}
+                completedLabIds={courseProgress?.completedAiLabIds || []}
+                onMarkLabCompleted={(labId) => handleMarkAiLabDone(selectedCourse.courseId, labId)}
+              />
+            )}
+          </div>
+        )}
 
         {/* Course Progress & Certificate Eligibility Card */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8 space-y-5">
@@ -1826,10 +2265,32 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
                     {(module.moduleAssignment || (module.knowledgeCheck && module.knowledgeCheck.length > 0)) && (
                       <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                         {module.moduleAssignment && (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wider">
-                              <ClipboardCheck className="w-4 h-4 text-amber-600" />
-                              <span>{module.moduleAssignment.title}</span>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 uppercase tracking-wider">
+                                <ClipboardCheck className="w-4 h-4 text-amber-600" />
+                                <span>{module.moduleAssignment.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {moduleAssignments[module.moduleId] && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    Submitted ({moduleAssignments[module.moduleId].submissionStatus.replace('_', ' ')})
+                                  </span>
+                                )}
+                                {(WEB_DEV_COURSE_IDS as readonly string[]).includes(selectedCourse.courseId) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenModuleAssignmentForm(module)}
+                                    className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold cursor-pointer whitespace-nowrap"
+                                  >
+                                    {openAssignmentModuleId === module.moduleId
+                                      ? 'Close Assignment Form'
+                                      : moduleAssignments[module.moduleId]
+                                        ? 'Update Submission'
+                                        : 'Submit Assignment'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <p className="text-xs text-slate-700">{module.moduleAssignment.description}</p>
                             <ul className="list-disc pl-5 text-[11px] text-slate-600 space-y-0.5">
@@ -1837,6 +2298,83 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
                                 <li key={i}>{d}</li>
                               ))}
                             </ul>
+
+                            {/* Per-Module Coding Assignment Form */}
+                            {openAssignmentModuleId === module.moduleId && (
+                              <form
+                                onSubmit={(e) => handleSubmitModuleAssignment(e, module)}
+                                className="mt-3 p-4 rounded-xl bg-white border border-amber-200 space-y-3 text-xs"
+                              >
+                                <span className="font-bold text-slate-900 block">
+                                  Submit {module.sequenceLabel} Assignment Evidence
+                                </span>
+                                {assignFeedback && (
+                                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-medium">
+                                    {assignFeedback}
+                                  </div>
+                                )}
+                                <div className="grid sm:grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                      GitHub Repo URL (Optional)
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={assignGithubUrl}
+                                      onChange={(e) => setAssignGithubUrl(e.target.value)}
+                                      placeholder="https://github.com/username/project"
+                                      className="w-full p-2 rounded-lg border border-slate-300 text-xs"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                      Live App URL (Optional)
+                                    </label>
+                                    <input
+                                      type="url"
+                                      value={assignLiveUrl}
+                                      onChange={(e) => setAssignLiveUrl(e.target.value)}
+                                      placeholder="https://your-app.netlify.app"
+                                      className="w-full p-2 rounded-lg border border-slate-300 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                    What You Built & Tested *
+                                  </label>
+                                  <textarea
+                                    required
+                                    rows={2}
+                                    value={assignDescription}
+                                    onChange={(e) => setAssignDescription(e.target.value)}
+                                    placeholder="Describe your implementation, edge cases checked, and what you verified..."
+                                    className="w-full p-2 rounded-lg border border-slate-300 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                                    Key Code Snippet / PR Diff Notes (Optional)
+                                  </label>
+                                  <textarea
+                                    rows={3}
+                                    value={assignCodeSnippet}
+                                    onChange={(e) => setAssignCodeSnippet(e.target.value)}
+                                    placeholder="// Paste a sanitized key component, HTML markup, or SQL snippet (no API keys)"
+                                    className="w-full p-2 rounded-lg border border-slate-300 font-mono text-[11px]"
+                                  />
+                                </div>
+                                <div className="flex justify-end">
+                                  <button
+                                    type="submit"
+                                    disabled={savingAssignment}
+                                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50"
+                                  >
+                                    {savingAssignment ? 'Saving...' : 'Save Module Assignment'}
+                                  </button>
+                                </div>
+                              </form>
+                            )}
                           </div>
                         )}
 
@@ -1955,7 +2493,36 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
               )}
               <p className="text-xs text-slate-700 whitespace-pre-line">{courseSubmission.projectDescription}</p>
 
-              {/* Supporting Links */}
+              {/* GitHub Repo, Live App, & Supporting Links */}
+              {(courseSubmission.githubRepoUrl || courseSubmission.liveAppUrl) && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {courseSubmission.githubRepoUrl && (
+                    <a
+                      href={courseSubmission.githubRepoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-slate-900 hover:underline font-semibold bg-white px-3 py-1.5 rounded-lg border border-slate-300 inline-flex items-center gap-1.5"
+                    >
+                      <FolderGit2 className="w-3.5 h-3.5" />
+                      <span>GitHub Repository</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  {courseSubmission.liveAppUrl && (
+                    <a
+                      href={courseSubmission.liveAppUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-emerald-800 hover:underline font-semibold bg-white px-3 py-1.5 rounded-lg border border-emerald-300 inline-flex items-center gap-1.5"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Live Deployed App</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+
               {courseSubmission.supportingLinks && courseSubmission.supportingLinks.length > 0 ? (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {courseSubmission.supportingLinks.map((lnk, idx) => (
@@ -2100,6 +2667,35 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
                   />
                 </div>
               </div>
+
+              {(WEB_DEV_COURSE_IDS as readonly string[]).includes(selectedCourse.courseId) && (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      GitHub Repository URL
+                    </label>
+                    <input
+                      type="url"
+                      value={githubRepoUrl}
+                      onChange={(e) => setGithubRepoUrl(e.target.value)}
+                      placeholder="https://github.com/username/web-app"
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Live Deployed Application URL
+                    </label>
+                    <input
+                      type="url"
+                      value={liveAppUrl}
+                      onChange={(e) => setLiveAppUrl(e.target.value)}
+                      placeholder="https://my-app.vercel.app"
+                      className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -2299,6 +2895,17 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
             {courseProgress?.finalAssessmentAttempts ? 'Retake Final Assessment' : 'Start Final Assessment'}
           </button>
         </div>
+
+        <WebDevPlacementModal
+          isOpen={showPlacementModal}
+          participantId={participantId}
+          onClose={() => setShowPlacementModal(false)}
+          onPlacementSaved={(res) => setPlacementResult(res)}
+          onSelectTrack={(cId) => {
+            const c = getCourseById(cId);
+            if (c) handleSelectCourse(c);
+          }}
+        />
       </div>
     );
   }
@@ -2310,6 +2917,15 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     const prog = progressMap[c.courseId];
     return (prog?.completedLessonIds?.length || 0) > 0 || (prog?.finalAssessmentAttempts || 0) > 0;
   }).length;
+
+  const webDevSummary = getWebDevProgressionSummary(progressMap, submissions, placementResult);
+  const webDevCourses = getWebDevCourses();
+
+  const formatCategoryLabel = (catId: string) => {
+    if (catId === 'web_development_academy') return 'Web Development Academy';
+    if (catId === 'digital_business') return 'Digital Business';
+    return catId.replace(/_/g, ' ');
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
@@ -2323,7 +2939,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
           Master Practical Digital Skills for Nigeria & the Global Market
         </h1>
         <p className="text-slate-600 text-sm md:text-base leading-relaxed mb-4">
-          {publishedCourses.length} complete, practical digital skills tracks designed to support corps members and emerging entrepreneurs with real-world capabilities.
+          {publishedCourses.length} complete, practical digital skills tracks including our full Beginner-to-Advanced Web Development Academy.
           Every track includes demonstrations, Nigerian business case studies, knowledge checks, and capstone projects.
         </p>
         <div className="inline-block bg-slate-100 border border-slate-200 text-slate-600 text-[11px] px-3.5 py-1.5 rounded-xl">
@@ -2333,7 +2949,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
 
       {/* Participant Stats Summary Bar (if logged in) */}
       {participant && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="p-3 bg-slate-50 rounded-xl">
             <span className="text-[11px] font-bold uppercase text-slate-400">Corps Member</span>
             <p className="text-sm font-bold text-slate-900 truncate">{participant.name}</p>
@@ -2356,6 +2972,134 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
             <p className="text-xl font-black text-indigo-600">
               {submissions.filter((s) => s.submissionStatus !== 'draft').length}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Web Development Academy Progression Dashboard */}
+      {webDevCourses.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-emerald-950 text-white rounded-3xl p-6 md:p-7 shadow-md mb-8 space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold">
+                <Code2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Web Development Academy • 3 Progressive Tracks (78 Lessons)</span>
+              </div>
+              <h2 className="text-xl md:text-2xl font-black tracking-tight">
+                From HTML/CSS/JS Fundamentals to AI-Powered Full-Stack SaaS
+              </h2>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                Practice HTML, CSS, and JavaScript live in our sandboxed editor, download React/TypeScript &amp; Node.js/SQL starter kits, and train inside the AI Development Lab.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowPlacementModal(true)}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+              >
+                <Compass className="w-4 h-4 text-amber-300" />
+                <span>{placementResult ? 'Retake Placement Check' : 'Find My Starting Track'}</span>
+              </button>
+              {webDevSummary.recommendedNextLessonId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = getCourseById(webDevSummary.recommendedNextCourseId);
+                    const lm = getCourseLesson(
+                      webDevSummary.recommendedNextCourseId,
+                      webDevSummary.recommendedNextLessonId!
+                    );
+                    if (c && lm) {
+                      handleOpenLesson(c, lm.module, lm.lesson);
+                    } else if (c) {
+                      handleSelectCourse(c);
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-black inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer shadow-sm"
+                >
+                  <span>Resume Next Lesson</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {placementResult && (
+            <div className="p-3 rounded-xl bg-white/10 border border-white/15 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span>
+                <strong className="text-emerald-300">Placement Recommendation:</strong>{' '}
+                {getCourseById(placementResult.recommendedCourseId)?.title} ({placementResult.score}/{placementResult.total} • {placementResult.percentage}%)
+              </span>
+              <span className="text-[11px] text-slate-300">All 3 tracks remain open to start anytime.</span>
+            </div>
+          )}
+
+          {/* Progression Metrics & 3-Stage Path */}
+          <div className="grid sm:grid-cols-3 gap-3 text-xs">
+            {[
+              {
+                courseId: 'web-development-beginner',
+                stage: 'Track A • Beginner',
+                pct: webDevSummary.beginnerPct,
+                done: webDevSummary.beginnerCompleted
+              },
+              {
+                courseId: 'web-development-intermediate',
+                stage: 'Track B • Intermediate + AI',
+                pct: webDevSummary.intermediatePct,
+                done: webDevSummary.intermediateCompleted
+              },
+              {
+                courseId: 'web-development-advanced',
+                stage: 'Track C • Advanced Full-Stack',
+                pct: webDevSummary.advancedPct,
+                done: webDevSummary.advancedCompleted
+              }
+            ].map((item) => {
+              const c = getCourseById(item.courseId);
+              if (!c) return null;
+              return (
+                <button
+                  key={item.courseId}
+                  type="button"
+                  onClick={() => handleSelectCourse(c)}
+                  className="text-left p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 transition cursor-pointer space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase font-bold text-amber-300">
+                      {item.stage}
+                    </span>
+                    <span className="text-[11px] font-bold text-emerald-300">
+                      {item.done ? 'Completed' : `${item.pct}%`}
+                    </span>
+                  </div>
+                  <p className="font-bold text-white text-sm leading-snug">{c.title}</p>
+                  <div className="w-full h-1.5 rounded-full bg-white/15 overflow-hidden">
+                    <div
+                      className="h-1.5 rounded-full bg-emerald-400 transition-all"
+                      style={{ width: `${item.pct}%` }}
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-300 flex items-center justify-between">
+                    <span>{c.modules.length} Modules • {c.expectedDuration}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-emerald-300" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-300">
+            <div className="flex flex-wrap items-center gap-4">
+              <span>Lessons: <strong className="text-white">{webDevSummary.totalLessonsCompleted}/{webDevSummary.totalLessonsAvailable}</strong></span>
+              <span>Coding Challenges: <strong className="text-white">{webDevSummary.totalCodingChallengesCompleted}</strong></span>
+              <span>AI Labs: <strong className="text-white">{webDevSummary.totalAiLabsCompleted}</strong></span>
+            </div>
+            {webDevSummary.nextEligibleLabel && (
+              <span className="text-amber-300 font-bold">{webDevSummary.nextEligibleLabel}</span>
+            )}
           </div>
         </div>
       )}
@@ -2389,13 +3133,13 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
             <button
               key={catId}
               onClick={() => setSelectedCategoryFilter(catId)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition capitalize cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                 selectedCategoryFilter === catId
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {catId.replace(/_/g, ' ')}
+              {formatCategoryLabel(catId)}
             </button>
           ))}
         </div>
@@ -2491,6 +3235,17 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
           );
         })}
       </div>
+
+      <WebDevPlacementModal
+        isOpen={showPlacementModal}
+        participantId={participantId}
+        onClose={() => setShowPlacementModal(false)}
+        onPlacementSaved={(res) => setPlacementResult(res)}
+        onSelectTrack={(cId) => {
+          const c = getCourseById(cId);
+          if (c) handleSelectCourse(c);
+        }}
+      />
     </div>
   );
 };

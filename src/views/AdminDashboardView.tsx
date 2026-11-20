@@ -37,7 +37,7 @@ import {
 } from '../services/adminService';
 import { DirectMessageModal } from '../components/DirectMessageModal';
 import { BroadcastMessagingView } from '../components/BroadcastMessagingView';
-import { ALL_ACADEMY_COURSES, getCourseById } from '../data/academy';
+import { ALL_ACADEMY_COURSES, WEB_DEV_COURSE_IDS, getCourseById, getWebDevCourses } from '../data/academy';
 import {
   generateQuestionCoverageReport,
   QUESTION_OBJECTIVE_MAPPINGS,
@@ -110,7 +110,10 @@ import {
   BookOpen,
   Send,
   MapPin,
-  Flag
+  Flag,
+  Code2,
+  FolderGit2,
+  Globe
 } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -2627,6 +2630,53 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                       </div>
                     </div>
 
+                    {/* WEB DEVELOPMENT ACADEMY LEVEL PROGRESSION OVERVIEW */}
+                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Code2 className="w-5 h-5 text-emerald-400" />
+                          <div>
+                            <h4 className="font-bold text-sm text-white">
+                              Web Development Academy Analytics (Beginner → Intermediate → Advanced)
+                            </h4>
+                            <p className="text-[11px] text-slate-300">
+                              Live progression across the 3 progressive Web Dev tracks, coding challenges, and AI Dev Labs.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        {getWebDevCourses().map((wc) => {
+                          const learners = academyProgressList.filter((p) => p.courseId === wc.courseId);
+                          const completedCount = learners.filter((p) => p.courseStatus === 'completed').length;
+                          const challengesDone = learners.reduce(
+                            (sum, p) => sum + (p.completedCodingChallengeIds?.length || 0),
+                            0
+                          );
+                          const labsDone = learners.reduce(
+                            (sum, p) => sum + (p.completedAiLabIds?.length || 0),
+                            0
+                          );
+                          const trackSubs = academySubmissions.filter((s) => s.courseId === wc.courseId).length;
+                          return (
+                            <div key={wc.courseId} className="p-3.5 rounded-xl bg-white/10 border border-white/15 space-y-1.5">
+                              <span className="text-[10px] font-mono uppercase font-bold text-amber-300">
+                                {wc.level || 'track'}
+                              </span>
+                              <p className="font-bold text-white leading-snug">{wc.title}</p>
+                              <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-300 pt-1">
+                                <span>Learners: <strong className="text-white">{learners.length}</strong></span>
+                                <span>Completed: <strong className="text-emerald-300">{completedCount}</strong></span>
+                                <span>Challenges: <strong className="text-white">{challengesDone}</strong></span>
+                                <span>AI Labs: <strong className="text-white">{labsDone}</strong></span>
+                                <span className="col-span-2">Submissions: <strong className="text-amber-300">{trackSubs}</strong></span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* LEARNER PROGRESS, ASSESSMENT & SUBMISSION FILTERS */}
                     <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -2880,25 +2930,55 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                                       {sub.platoon ? `Platoon ${sub.platoon}` : 'Post-Camp'}
                                     </td>
                                     <td className="p-3 text-[11px] text-stone-600">
-                                      {sub.courseTitle || sub.courseId}
+                                      <span>{sub.courseTitle || sub.courseId}</span>
+                                      {sub.submissionType === 'coding_assignment' && (
+                                        <span className="block text-[10px] font-bold text-indigo-700">
+                                          Module Coding Assignment
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="p-3 max-w-xs truncate">{sub.projectTitle}</td>
                                     <td className="p-3">
-                                      {primaryLink ? (
-                                        <a
-                                          href={primaryLink}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
-                                        >
-                                          <span>Open Link</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      ) : (
-                                        <span className="text-stone-400">
-                                          {sub.uploadedAttachments?.length || 0} file(s)
-                                        </span>
-                                      )}
+                                      <div className="flex flex-col gap-1">
+                                        {sub.githubRepoUrl && (
+                                          <a
+                                            href={sub.githubRepoUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-stone-800 hover:underline flex items-center gap-1 font-semibold"
+                                          >
+                                            <FolderGit2 className="w-3 h-3" />
+                                            <span>GitHub Repo</span>
+                                          </a>
+                                        )}
+                                        {sub.liveAppUrl && (
+                                          <a
+                                            href={sub.liveAppUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-emerald-700 hover:underline flex items-center gap-1 font-semibold"
+                                          >
+                                            <Globe className="w-3 h-3" />
+                                            <span>Live App</span>
+                                          </a>
+                                        )}
+                                        {primaryLink && !sub.liveAppUrl && !sub.githubRepoUrl && (
+                                          <a
+                                            href={primaryLink}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                                          >
+                                            <span>Open Link</span>
+                                            <ExternalLink className="w-3 h-3" />
+                                          </a>
+                                        )}
+                                        {!primaryLink && !sub.githubRepoUrl && !sub.liveAppUrl && (
+                                          <span className="text-stone-400">
+                                            {sub.uploadedAttachments?.length || 0} file(s)
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="p-3">
                                       <span
@@ -3259,12 +3339,32 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                       </div>
                     )}
 
-                  {/* Supporting Links & Files */}
+                  {/* GitHub Repo, Live App, Code Snippet & Supporting Links */}
                   <div className="space-y-1.5">
                     <span className="text-[10px] uppercase text-stone-400 font-bold block">
                       Supporting Links & Evidence
                     </span>
                     <div className="flex flex-wrap gap-2">
+                      {reviewingSub.githubRepoUrl && (
+                        <a
+                          href={reviewingSub.githubRepoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-stone-900 hover:underline font-bold inline-flex items-center gap-1 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-300"
+                        >
+                          <FolderGit2 className="w-3 h-3" /> GitHub Repo <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                      {reviewingSub.liveAppUrl && (
+                        <a
+                          href={reviewingSub.liveAppUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-emerald-800 hover:underline font-bold inline-flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+                        >
+                          <Globe className="w-3 h-3" /> Live App <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                       {reviewingSub.supportingLinks && reviewingSub.supportingLinks.length > 0 ? (
                         reviewingSub.supportingLinks.map((lnk, idx) => (
                           <a
@@ -3290,6 +3390,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onClose 
                         )
                       )}
                     </div>
+                    {reviewingSub.codeSnippet && (
+                      <div className="pt-1">
+                        <span className="text-[10px] uppercase text-stone-500 font-bold block mb-1">
+                          Submitted Code Snippet / Notes
+                        </span>
+                        <pre className="p-2.5 rounded-lg bg-slate-900 text-emerald-200 text-[11px] font-mono overflow-x-auto max-h-40">
+                          {reviewingSub.codeSnippet}
+                        </pre>
+                      </div>
+                    )}
                     {reviewingSub.uploadedAttachments && reviewingSub.uploadedAttachments.length > 0 && (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {reviewingSub.uploadedAttachments.map((att, idx) => (

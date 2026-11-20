@@ -264,6 +264,47 @@ export interface LessonKnowledgeCheckQuestion {
   explanation: string;
 }
 
+export interface LessonCodeExample {
+  title: string;
+  language: 'html' | 'css' | 'javascript' | 'typescript' | 'tsx' | 'sql' | 'bash' | 'json' | 'markdown';
+  code: string;
+  explanation: string[];
+  expectedOutput?: string;
+}
+
+export interface LessonCommonError {
+  error: string;
+  cause: string;
+  fix: string;
+}
+
+export interface LessonCodingChallenge {
+  id: string;
+  title: string;
+  prompt: string;
+  starterCode: string;
+  language: 'html' | 'css' | 'javascript' | 'react_local' | 'node_sql_local';
+  runnableInBrowser: boolean;
+  expectedOutput?: string;
+  hints: string[];
+  validationChecks?: Array<{ label: string; pattern: string }>;
+  solutionSummary?: string;
+  localSetupSteps?: string[];
+}
+
+export interface AiLabChallenge {
+  id: string;
+  trackLevel: 'intermediate' | 'advanced';
+  category: 'fundamentals' | 'app_building' | 'advanced_engineering';
+  title: string;
+  problemStatement: string;
+  samplePrompt: string;
+  expectedAiOutput: string;
+  learnerTask: string;
+  codeReviewChecklist: string[];
+  securityReminder: string;
+}
+
 export interface CourseLesson {
   lessonId: string;
   moduleId: string;
@@ -273,17 +314,23 @@ export interface CourseLesson {
   sequenceLabel: string; // e.g. "Lesson 1.1"
   estimatedDurationMinutes: number;
   learningObjectiveIds: string[];
+  learningObjectives?: string[];
   introduction: string;
   lessonContent: string[]; // Rich paragraphs of step-by-step teaching material
   stepByStepInstructions?: string[]; // Actionable beginner-friendly numbered steps
   nigerianContextExamples: string[]; // Local practical examples (PPA, SMEs, NYSC, market vendors)
   toolsAndResources?: string[]; // Relevant tools, apps, and platforms
   practicalDemonstration: string; // Hands-on demo / walk-through
+  codeExamples?: LessonCodeExample[];
+  commonErrors?: LessonCommonError[];
+  codingChallenge?: LessonCodingChallenge;
+  aiLabChallenge?: AiLabChallenge;
   handsOnExercise: {
     title: string;
     task: string;
     steps: string[];
     deliverable: string;
+    hints?: string[];
   };
   keyTakeaways: string[];
   knowledgeCheck: LessonKnowledgeCheckQuestion[];
@@ -304,6 +351,7 @@ export interface ModuleAssignment {
   title: string;
   description: string;
   deliverables: string[];
+  evaluationCriteria?: string[];
   submissionNote?: string;
 }
 
@@ -354,12 +402,27 @@ export interface AcademyCourse {
   subtitle?: string;
   description: string;
   difficulty?: 'Beginner' | 'Beginner to Intermediate' | 'Intermediate' | 'Advanced';
+  level?: 'beginner' | 'intermediate' | 'advanced';
+  prerequisites?: string[];
   targetAudience: string;
   entryRequirements: string;
   requirements?: string[];
   learningObjectives: { id: string; code: string; title: string; description: string }[];
   expectedDuration: string; // e.g. "4 Weeks (Self-Paced)"
   modules: CourseModule[];
+  practicalProjects?: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    deliverables: string[];
+  }>;
+  starterProjectTemplates?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    setupCommand: string;
+    files: Array<{ path: string; content: string }>;
+  }>;
   capstoneProject: CourseCapstoneProject;
   finalAssessment: CourseFinalAssessmentQuestion[];
   completionCriteria: {
@@ -421,6 +484,8 @@ export interface CapstoneUploadedAttachment {
 export interface CourseProjectSubmission {
   id?: string;
   submissionId: string;
+  submissionType?: 'capstone' | 'coding_assignment';
+  moduleId?: string;
   participantId: string;
   participantName: string;
   stateCode?: string;
@@ -434,6 +499,9 @@ export interface CourseProjectSubmission {
   businessName?: string;
   targetCustomerSummary?: string;
   valueProposition?: string;
+  githubRepoUrl?: string;
+  liveAppUrl?: string;
+  codeSnippet?: string;
   deliverablesChecklist?: Record<string, boolean>;
   supportingLinks?: CapstoneSupportingLink[];
   uploadedAttachments?: CapstoneUploadedAttachment[];
@@ -460,6 +528,17 @@ export interface ModuleCheckDetail {
   completedAt: string;
 }
 
+export interface WebDevPlacementResult {
+  score: number;
+  total: number;
+  percentage: number;
+  recommendedCourseId: 'web-development-beginner' | 'web-development-intermediate' | 'web-development-advanced';
+  recommendedLevel: 'beginner' | 'intermediate' | 'advanced';
+  rationale: string;
+  domainBreakdown: Record<string, { score: number; total: number }>;
+  completedAt: string;
+}
+
 export interface ParticipantCourseProgress {
   participantId: string;
   participantName?: string;
@@ -471,6 +550,8 @@ export interface ParticipantCourseProgress {
   lastAccessedLessonId?: string;
   completedLessonIds: string[];
   completedModuleIds: string[];
+  completedCodingChallengeIds?: string[];
+  completedAiLabIds?: string[];
   moduleCheckScores: Record<string, number>; // moduleId -> best score (%)
   moduleCheckDetails?: Record<string, ModuleCheckDetail>;
   finalAssessmentScore?: number;
