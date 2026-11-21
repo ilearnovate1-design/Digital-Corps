@@ -1,20 +1,22 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { NavigationTab } from '../types';
 import { Sparkles, Shield, WifiOff, Award } from 'lucide-react';
 
 interface HeaderProps {
-  currentTab: NavigationTab;
-  onNavigate: (tab: NavigationTab) => void;
+  currentTab?: NavigationTab | null;
+  onNavigate?: (tab: NavigationTab) => void;
   registeredUser: any | null;
-  onOpenAdmin: () => void;
+  onOpenAdmin?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  currentTab,
-  onNavigate,
   registeredUser,
   onOpenAdmin
 }) => {
+  const location = useLocation();
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
   return (
     <header className="sticky top-0 z-30 bg-[#046A38] text-white shadow-md">
       {/* Top micro bar clarifying independent initiative supporting corps members */}
@@ -27,22 +29,26 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="bg-emerald-900/80 px-1.5 py-0.5 rounded text-[10px] text-emerald-200 flex items-center gap-1">
             <WifiOff className="w-2.5 h-2.5" /> Zero-Data Offline Ready
           </span>
-          <button
-            onClick={onOpenAdmin}
+          <Link
+            to="/admin"
+            state={{ from: location.pathname }}
+            onClick={() => {
+              if (onOpenAdmin) onOpenAdmin();
+            }}
             className="text-[10px] text-amber-300 hover:text-white underline cursor-pointer flex items-center gap-1 font-sans"
             title="Coordinator Admin Portal"
           >
             <Shield className="w-3 h-3" />
             <span>Admin Portal</span>
-          </button>
+          </Link>
         </div>
       </div>
 
       {/* Main app bar */}
       <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => onNavigate('welcome')}
+        <Link
+          to="/"
+          onClick={scrollToTop}
           title="Back to Home"
           aria-label="Digital Corps Hub Home"
           className="flex items-center gap-2.5 cursor-pointer select-none group text-left"
@@ -66,13 +72,14 @@ export const Header: React.FC<HeaderProps> = ({
               Empowering 2,000 Corps Members • Independent Skills Initiative
             </p>
           </div>
-        </button>
+        </Link>
 
         {/* Right side action */}
         <div className="flex items-center gap-2">
           {registeredUser ? (
-            <button
-              onClick={() => onNavigate('success')}
+            <Link
+              to="/pass"
+              onClick={scrollToTop}
               className="bg-amber-400 hover:bg-amber-300 text-stone-950 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
             >
               <Award className="w-3.5 h-3.5 text-stone-900" />
@@ -84,15 +91,16 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'CDS'
                   : 'PASS'}
               </span>
-            </button>
+            </Link>
           ) : (
-            <button
-              onClick={() => onNavigate('register')}
+            <Link
+              to="/register"
+              onClick={scrollToTop}
               className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow transition-all active:scale-95 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>Register Now</span>
-            </button>
+            </Link>
           )}
         </div>
       </div>

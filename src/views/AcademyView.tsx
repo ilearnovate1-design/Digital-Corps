@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { getAcademyUrl } from '../routes';
 import {
   BookOpen,
   CheckCircle2,
@@ -113,6 +115,89 @@ function shuffleWithPerm<T>(arr: T[]): T[] {
   return copy;
 }
 
+function resolveAcademyTarget(initialCourseId?: string | null, initialLessonId?: string | null): {
+  viewMode: 'catalog' | 'course_detail' | 'lesson_reader' | 'final_assessment' | 'module_check';
+  selectedCourse: AcademyCourse | null;
+  selectedModule: CourseModule | null;
+  selectedLesson: CourseLesson | null;
+  unknownCourseId: string | null;
+  categoryFilter: string;
+  showPlacementModal: boolean;
+  expandedModules: Record<string, boolean>;
+} {
+  if (initialCourseId === '__webdev_placement__') {
+    return {
+      viewMode: 'catalog',
+      selectedCourse: null,
+      selectedModule: null,
+      selectedLesson: null,
+      unknownCourseId: null,
+      categoryFilter: 'web_development_academy',
+      showPlacementModal: true,
+      expandedModules: {}
+    };
+  }
+
+  if (!initialCourseId) {
+    return {
+      viewMode: 'catalog',
+      selectedCourse: null,
+      selectedModule: null,
+      selectedLesson: null,
+      unknownCourseId: null,
+      categoryFilter: 'all',
+      showPlacementModal: false,
+      expandedModules: {}
+    };
+  }
+
+  const course = getCourseById(initialCourseId);
+  if (!course) {
+    return {
+      viewMode: 'catalog',
+      selectedCourse: null,
+      selectedModule: null,
+      selectedLesson: null,
+      unknownCourseId: initialCourseId,
+      categoryFilter: 'all',
+      showPlacementModal: false,
+      expandedModules: {}
+    };
+  }
+
+  const expandedModules: Record<string, boolean> = {};
+  course.modules.forEach((m) => {
+    expandedModules[m.moduleId] = true;
+  });
+
+  if (initialLessonId) {
+    const lessonMatch = getCourseLesson(initialCourseId, initialLessonId);
+    if (lessonMatch) {
+      return {
+        viewMode: 'lesson_reader',
+        selectedCourse: course,
+        selectedModule: lessonMatch.module,
+        selectedLesson: lessonMatch.lesson,
+        unknownCourseId: null,
+        categoryFilter: 'all',
+        showPlacementModal: false,
+        expandedModules
+      };
+    }
+  }
+
+  return {
+    viewMode: 'course_detail',
+    selectedCourse: course,
+    selectedModule: null,
+    selectedLesson: null,
+    unknownCourseId: null,
+    categoryFilter: 'all',
+    showPlacementModal: false,
+    expandedModules
+  };
+}
+
 export const AcademyView: React.FC<AcademyViewProps> = ({
   participant,
   initialCourseId,
@@ -120,20 +205,29 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
   onNavigateToQuiz,
   onClearDeepLink
 }) => {
+  const navigate = useNavigate();
+  const initialTarget = useMemo(
+    () => resolveAcademyTarget(initialCourseId, initialLessonId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const isFirstTargetSync = React.useRef(true);
+
   // Navigation states: 'catalog' | 'course_detail' | 'lesson_reader' | 'final_assessment' | 'module_check'
   const [viewMode, setViewMode] = useState<
     'catalog' | 'course_detail' | 'lesson_reader' | 'final_assessment' | 'module_check'
-  >('catalog');
-  const [selectedCourse, setSelectedCourse] = useState<AcademyCourse | null>(null);
-  const [selectedModule, setSelectedModule] = useState<CourseModule | null>(null);
-  const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(null);
+  >(initialTarget.viewMode);
+  const [selectedCourse, setSelectedCourse] = useState<AcademyCourse | null>(initialTarget.selectedCourse);
+  const [selectedModule, setSelectedModule] = useState<CourseModule | null>(initialTarget.selectedModule);
+  const [selectedLesson, setSelectedLesson] = useState<CourseLesson | null>(initialTarget.selectedLesson);
+  const [unknownCourseId, setUnknownCourseId] = useState<string | null>(initialTarget.unknownCourseId);
 
   // Global config & progress records
   const [globalConfig, setGlobalConfig] = useState<AcademyGlobalConfig>(DEFAULT_ACADEMY_GLOBAL_CONFIG);
   const [progressMap, setProgressMap] = useState<Record<string, ParticipantCourseProgress>>({});
   const [submissions, setSubmissions] = useState<CourseProjectSubmission[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>(initialTarget.categoryFilter);
 
   // Lesson reader interactive state
   const [knowledgeAnswers, setKnowledgeAnswers] = useState<Record<number, number>>({});
@@ -174,7 +268,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
 
   // Web Development Academy state
   const [placementResult, setPlacementResult] = useState<WebDevPlacementResult | null>(null);
-  const [showPlacementModal, setShowPlacementModal] = useState<boolean>(false);
+  const [showPlacementModal, setShowPlacementModal] = useState<boolean>(initialTarget.showPlacementModal);
   const [showCourseAiLab, setShowCourseAiLab] = useState<boolean>(false);
   const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
   const [moduleAssignments, setModuleAssignments] = useState<Record<string, CourseProjectSubmission>>({});
@@ -219,7 +313,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
   } | null>(null);
 
   // Accordion expanded modules in Course Detail
-  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>(initialTarget.expandedModules);
 
   // YouTube Subscription State
   const [hasSubscribed, setHasSubscribed] = useState<boolean>(false);
@@ -248,39 +342,27 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     loadData();
   }, [participantId]);
 
-  // Handle deep-linking from Quiz results or direct links
+  // Handle subsequent URL param / deep-link transitions (e.g., Back/Forward or nav links)
   useEffect(() => {
-    if (initialCourseId === '__webdev_placement__') {
-      setViewMode('catalog');
-      setSelectedCategoryFilter('web_development_academy');
-      setShowPlacementModal(true);
-      if (onClearDeepLink) onClearDeepLink();
+    if (isFirstTargetSync.current) {
+      isFirstTargetSync.current = false;
       return;
     }
 
-    if (initialCourseId) {
-      const course = getCourseById(initialCourseId);
-      if (course) {
-        setSelectedCourse(course);
-        const initExpanded: Record<string, boolean> = {};
-        course.modules.forEach((m) => {
-          initExpanded[m.moduleId] = true;
-        });
-        setExpandedModules(initExpanded);
-
-        if (initialLessonId) {
-          const lessonMatch = getCourseLesson(initialCourseId, initialLessonId);
-          if (lessonMatch) {
-            setSelectedModule(lessonMatch.module);
-            setSelectedLesson(lessonMatch.lesson);
-            setViewMode('lesson_reader');
-          } else {
-            setViewMode('course_detail');
-          }
-        } else {
-          setViewMode('course_detail');
-        }
-      }
+    const next = resolveAcademyTarget(initialCourseId, initialLessonId);
+    setUnknownCourseId(next.unknownCourseId);
+    setSelectedCourse(next.selectedCourse);
+    setSelectedModule(next.selectedModule);
+    setSelectedLesson(next.selectedLesson);
+    setViewMode(next.viewMode);
+    if (Object.keys(next.expandedModules).length > 0) {
+      setExpandedModules(next.expandedModules);
+    }
+    if (initialCourseId === '__webdev_placement__') {
+      setSelectedCategoryFilter('web_development_academy');
+      setShowPlacementModal(true);
+    } else if (showPlacementModal) {
+      setShowPlacementModal(false);
     }
   }, [initialCourseId, initialLessonId]);
 
@@ -372,6 +454,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
   );
 
   const handleSelectCourse = (course: AcademyCourse) => {
+    setUnknownCourseId(null);
     setSelectedCourse(course);
     const exp: Record<string, boolean> = {};
     course.modules.forEach((m, idx) => {
@@ -379,14 +462,17 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
     });
     setExpandedModules(exp);
     setViewMode('course_detail');
+    navigate(getAcademyUrl(course.courseId));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenLesson = (course: AcademyCourse, module: CourseModule, lesson: CourseLesson) => {
+    setUnknownCourseId(null);
     setSelectedCourse(course);
     setSelectedModule(module);
     setSelectedLesson(lesson);
     setViewMode('lesson_reader');
+    navigate(getAcademyUrl(course.courseId, lesson.lessonId));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -452,11 +538,13 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
       const prev = allLessons[currentIndex - 1];
       setSelectedModule(prev.module);
       setSelectedLesson(prev.lesson);
+      navigate(getAcademyUrl(selectedCourse.courseId, prev.lesson.lessonId));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (direction === 'next' && currentIndex < allLessons.length - 1) {
       const next = allLessons[currentIndex + 1];
       setSelectedModule(next.module);
       setSelectedLesson(next.lesson);
+      navigate(getAcademyUrl(selectedCourse.courseId, next.lesson.lessonId));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -961,6 +1049,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
             onClick={() => {
               if (onClearDeepLink) onClearDeepLink();
               setViewMode('catalog');
+              navigate('/academy');
             }}
             className="hover:text-emerald-600 transition flex items-center gap-1 font-medium cursor-pointer"
           >
@@ -969,7 +1058,10 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
           <button
-            onClick={() => setViewMode('course_detail')}
+            onClick={() => {
+              setViewMode('course_detail');
+              navigate(getAcademyUrl(selectedCourse.courseId));
+            }}
             className="hover:text-emerald-600 transition truncate max-w-[200px] cursor-pointer"
           >
             {selectedCourse.title}
@@ -1454,7 +1546,10 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
 
         <div className="flex justify-center">
           <button
-            onClick={() => setViewMode('course_detail')}
+            onClick={() => {
+              setViewMode('course_detail');
+              navigate(getAcademyUrl(selectedCourse.courseId));
+            }}
             className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 py-2 px-4 rounded-lg hover:bg-slate-100 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -1753,6 +1848,7 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
           onClick={() => {
             if (onClearDeepLink) onClearDeepLink();
             setViewMode('catalog');
+            navigate('/academy');
           }}
           className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5 mb-6 cursor-pointer"
         >
@@ -2947,6 +3043,23 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
         </div>
       </div>
 
+      {unknownCourseId && (
+        <div className="max-w-3xl mx-auto mb-6 p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div>
+            <p className="font-bold text-amber-950">Course Not Found</p>
+            <p className="text-amber-900 mt-0.5">
+              We couldn&apos;t find a course matching <code className="font-mono bg-white/80 px-1 py-0.5 rounded">{unknownCourseId}</code>. Browse all available tracks below.
+            </p>
+          </div>
+          <Link
+            to="/academy"
+            className="px-3.5 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold whitespace-nowrap self-start sm:self-center"
+          >
+            View All Courses
+          </Link>
+        </div>
+      )}
+
       {/* Participant Stats Summary Bar (if logged in) */}
       {participant && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -3239,7 +3352,12 @@ export const AcademyView: React.FC<AcademyViewProps> = ({
       <WebDevPlacementModal
         isOpen={showPlacementModal}
         participantId={participantId}
-        onClose={() => setShowPlacementModal(false)}
+        onClose={() => {
+          setShowPlacementModal(false);
+          if (initialCourseId === '__webdev_placement__') {
+            navigate('/academy');
+          }
+        }}
         onPlacementSaved={(res) => setPlacementResult(res)}
         onSelectTrack={(cId) => {
           const c = getCourseById(cId);

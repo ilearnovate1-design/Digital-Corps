@@ -505,6 +505,11 @@ async function startServer() {
     }
   });
 
+  // Ensure unmatched /api/* endpoints return JSON 404 instead of SPA HTML
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ success: false, error: 'API endpoint not found' });
+  });
+
   // Mount Vite or static files
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.resolve(process.cwd(), 'dist');

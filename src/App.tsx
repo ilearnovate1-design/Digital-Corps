@@ -4,7 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { NavigationTab, ParticipantRegistration } from './types';
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { NavigationTab, ParticipantRegistration, RegisteredParticipant } from './types';
+import { TAB_TO_PATH, getTabFromPathname, getAcademyUrl } from './routes';
 import { syncPendingRegistrations } from './services/participantService';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -19,19 +21,49 @@ import { CommunityOptInView } from './views/CommunityOptInView';
 import { SuccessView } from './views/SuccessView';
 import { AdminDashboardView } from './views/AdminDashboardView';
 import { AcademyView } from './views/AcademyView';
-import { RegisteredParticipant } from './types';
+import { NotFoundView } from './views/NotFoundView';
 
 const LOCAL_STORAGE_KEY = 'dch_nysc_registered_user';
 
+interface AcademyRouteWrapperProps {
+  participant: RegisteredParticipant | null;
+  forceCourseId?: string;
+}
+
+const AcademyRouteWrapper: React.FC<AcademyRouteWrapperProps> = ({
+  participant,
+  forceCourseId
+}) => {
+  const { courseId, lessonId } = useParams<{ courseId?: string; lessonId?: string }>();
+  const navigate = useNavigate();
+
+  const resolvedCourseId = forceCourseId || (courseId ? decodeURIComponent(courseId) : null);
+  const resolvedLessonId = lessonId ? decodeURIComponent(lessonId) : null;
+
+  return (
+    <AcademyView
+      participant={participant}
+      initialCourseId={resolvedCourseId}
+      initialLessonId={resolvedLessonId}
+      onNavigateToQuiz={() => {
+        navigate('/quiz');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }}
+      onClearDeepLink={() => {
+        navigate('/academy');
+      }}
+    />
+  );
+};
+
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<NavigationTab>('welcome');
   const [registeredUser, setRegisteredUser] = useState<ParticipantRegistration | null>(null);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
-  // Deep-linking state for Academy
-  const [selectedAcademyCourseId, setSelectedAcademyCourseId] = useState<string | null>(null);
-  const [selectedAcademyLessonId, setSelectedAcademyLessonId] = useState<string | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentTab: NavigationTab | null = getTabFromPathname(location.pathname);
 
   // Load from browser storage on initial boot (zero cloud read)
   useEffect(() => {
@@ -70,20 +102,22 @@ export default function App() {
   };
 
   const handleNavigate = (tab: NavigationTab) => {
-    // If navigating directly to academy from tabs, clear previous deep links
-    if (tab === 'academy') {
-      setSelectedAcademyCourseId(null);
-      setSelectedAcademyLessonId(null);
-    }
-    setCurrentTab(tab);
+    navigate(TAB_TO_PATH[tab] || '/');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNavigateToAcademy = (courseId: string, lessonId?: string) => {
-    setSelectedAcademyCourseId(courseId);
-    setSelectedAcademyLessonId(lessonId || null);
-    setCurrentTab('academy');
+    navigate(getAcademyUrl(courseId, lessonId));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCloseAdmin = () => {
+    const state = location.state as { from?: string } | null;
+    if (state?.from && state.from !== '/admin') {
+      navigate(state.from);
+    } else {
+      navigate('/');
+    }
   };
 
   const participantProfile: RegisteredParticipant | null = registeredUser ? {
@@ -106,7 +140,6 @@ export default function App() {
         currentTab={currentTab}
         onNavigate={handleNavigate}
         registeredUser={registeredUser}
-        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {/* Navigation Bars */}
@@ -116,76 +149,117 @@ export default function App() {
         isRegistered={!!registeredUser}
       />
 
-      {/* Main Content Area: Zero Firestore reads for page rendering */}
+      {/* Main Content Area: URL-Driven Routes with Zero Firestore Reads for Page Rendering */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 pt-5 pb-8">
-        {currentTab === 'welcome' && (
-          <WelcomeView
-            onNavigate={handleNavigate}
-            isRegistered={!!registeredUser}
-            onOpenPrivacyNotice={() => setIsPrivacyModalOpen(true)}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <WelcomeView
+                onNavigate={handleNavigate}
+                isRegistered={!!registeredUser}
+                onOpenPrivacyNotice={() => setIsPrivacyModalOpen(true)}
+              />
+            }
           />
-        )}
 
-        {currentTab === 'quiz' && (
-          <QuizView
-            onNavigate={handleNavigate}
-            registeredUser={registeredUser}
-            isRegistered={!!registeredUser}
-            onNavigateToAcademy={handleNavigateToAcademy}
+          <Route
+            path="/quiz"
+            element={
+              <QuizView
+                onNavigate={handleNavigate}
+                registeredUser={registeredUser}
+                isRegistered={!!registeredUser}
+                onNavigateToAcademy={handleNavigateToAcademy}
+              />
+            }
           />
-        )}
 
-        {currentTab === 'academy' && (
-          <AcademyView
-            participant={participantProfile}
-            initialCourseId={selectedAcademyCourseId}
-            initialLessonId={selectedAcademyLessonId}
-            onNavigateToQuiz={() => {
-              setCurrentTab('quiz');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onClearDeepLink={() => {
-              setSelectedAcademyCourseId(null);
-              setSelectedAcademyLessonId(null);
-            }}
+          <Route
+            path="/academy"
+            element={<AcademyRouteWrapper participant={participantProfile} />}
           />
-        )}
-
-        {currentTab === 'register' && (
-          <RegistrationView
-            initialData={registeredUser}
-            onSaveRegistration={handleSaveRegistration}
-            onNavigate={handleNavigate}
-            onOpenPrivacyNotice={() => setIsPrivacyModalOpen(true)}
+          <Route
+            path="/academy/placement"
+            element={
+              <AcademyRouteWrapper
+                participant={participantProfile}
+                forceCourseId="__webdev_placement__"
+              />
+            }
           />
-        )}
-
-        {currentTab === 'challenge' && (
-          <PlatoonChallengeView
-            userPlatoon={registeredUser?.platoon}
-            userName={registeredUser ? `${registeredUser.firstName} ${registeredUser.surname}` : undefined}
-            userStateCode={registeredUser?.stateCode}
+          <Route
+            path="/academy/:courseId"
+            element={<AcademyRouteWrapper participant={participantProfile} />}
           />
-        )}
-
-        {currentTab === 'toolkit' && (
-          <ToolkitView />
-        )}
-
-        {currentTab === 'community' && (
-          <CommunityOptInView
-            registeredUser={registeredUser}
-            onUpdateOptIn={handleUpdateOptIn}
-            onNavigateToRegistration={() => handleNavigate('register')}
+          <Route
+            path="/academy/:courseId/:lessonId"
+            element={<AcademyRouteWrapper participant={participantProfile} />}
           />
-        )}
 
-        {currentTab === 'success' && (
-          <SuccessView
-            registrationId={registeredUser?.registrationId}
-            onNavigate={handleNavigate}
+          <Route
+            path="/register"
+            element={
+              <RegistrationView
+                initialData={registeredUser}
+                onSaveRegistration={handleSaveRegistration}
+                onNavigate={handleNavigate}
+                onOpenPrivacyNotice={() => setIsPrivacyModalOpen(true)}
+              />
+            }
           />
-        )}
+
+          <Route
+            path="/challenge"
+            element={
+              <PlatoonChallengeView
+                userPlatoon={registeredUser?.platoon}
+                userName={registeredUser ? `${registeredUser.firstName} ${registeredUser.surname}` : undefined}
+                userStateCode={registeredUser?.stateCode}
+              />
+            }
+          />
+
+          <Route path="/toolkit" element={<ToolkitView />} />
+
+          <Route
+            path="/community"
+            element={
+              <CommunityOptInView
+                registeredUser={registeredUser}
+                onUpdateOptIn={handleUpdateOptIn}
+                onNavigateToRegistration={() => handleNavigate('register')}
+              />
+            }
+          />
+
+          <Route
+            path="/pass"
+            element={
+              <SuccessView
+                registrationId={registeredUser?.registrationId}
+                onNavigate={handleNavigate}
+              />
+            }
+          />
+          <Route path="/success" element={<Navigate to="/pass" replace />} />
+
+          <Route
+            path="/admin"
+            element={
+              <>
+                <WelcomeView
+                  onNavigate={handleNavigate}
+                  isRegistered={!!registeredUser}
+                  onOpenPrivacyNotice={() => setIsPrivacyModalOpen(true)}
+                />
+                <AdminDashboardView onClose={handleCloseAdmin} />
+              </>
+            }
+          />
+
+          <Route path="*" element={<NotFoundView />} />
+        </Routes>
       </main>
 
       {/* Footer with FAQs and Privacy notice trigger */}
@@ -196,12 +270,6 @@ export default function App() {
         isOpen={isPrivacyModalOpen}
         onClose={() => setIsPrivacyModalOpen(false)}
       />
-
-      {isAdminOpen && (
-        <AdminDashboardView
-          onClose={() => setIsAdminOpen(false)}
-        />
-      )}
     </div>
   );
 }
